@@ -1,0 +1,2886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>PhysLab 3D · Classical & Quantum Physics Virtual Laboratory</title>
+  
+  <!-- KaTeX for crisp mathematical formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+  <!-- Three.js & OrbitControls -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #030712;
+      --surface: rgba(15, 23, 42, 0.78);
+      --surface-border: rgba(148, 163, 184, 0.18);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #fbbf24;
+      --accent-glow: rgba(251, 191, 36, 0.4);
+      --accent-bg: rgba(251, 191, 36, 0.12);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body.quantum {
+      --accent: #22d3ee;
+      --accent-glow: rgba(34, 211, 238, 0.4);
+      --accent-bg: rgba(34, 211, 238, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    #webgl-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 1;
+    }
+
+    /* Glassmorphic UI containers */
+    .glass {
+      position: fixed;
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--surface-border);
+      border-radius: 16px;
+      box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7), 0 0 25px -8px var(--accent-glow);
+      z-index: 10;
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    /* Top Navigation & Status Bar */
+    #top-bar {
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      height: 52px;
+      padding: 0 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), #38bdf8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 15px var(--accent-glow);
+      color: #030712;
+      font-weight: 900;
+      font-size: 16px;
+    }
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-badge {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 9999px;
+      background: var(--accent-bg);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .top-hint {
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .top-hint b {
+      color: var(--text);
+    }
+
+    /* Left Control Sidebar */
+    #left-drawer {
+      top: 76px;
+      left: 14px;
+      bottom: 76px;
+      width: 270px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tab-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: rgba(2, 6, 23, 0.5);
+      padding: 4px;
+      border-radius: 12px;
+      border: 1px solid var(--surface-border);
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+    }
+    .tab-btn.active {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.4), 0 0 15px -3px var(--accent-glow);
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--surface-border);
+      background: rgba(2, 6, 23, 0.6);
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-input:focus {
+      border-color: var(--accent);
+    }
+
+    .node-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 2px;
+    }
+    .node-list::-webkit-scrollbar {
+      width: 4px;
+    }
+    .node-list::-webkit-scrollbar-thumb {
+      background: var(--surface-border);
+      border-radius: 4px;
+    }
+
+    .node-item {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      padding: 9px 12px;
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--surface-border);
+      border-radius: 10px;
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: left;
+      width: 100%;
+    }
+    .node-item:hover {
+      background: rgba(30, 41, 59, 0.7);
+      border-color: var(--accent);
+      transform: translateX(3px);
+    }
+    .node-item.active {
+      border-color: var(--accent);
+      background: var(--accent-bg);
+      box-shadow: 0 0 15px -4px var(--accent-glow);
+    }
+    .node-item .name {
+      font-weight: 600;
+      font-size: 12.5px;
+      color: var(--text);
+    }
+    .node-item.active .name {
+      color: var(--accent);
+    }
+    .node-item .sub {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* Right Knowledge Drawer */
+    #right-drawer {
+      top: 76px;
+      right: 14px;
+      bottom: 76px;
+      width: 390px;
+      padding: 18px;
+      overflow-y: auto;
+      transform: translateX(120%);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    #right-drawer.open {
+      transform: translateX(0);
+    }
+    #right-drawer::-webkit-scrollbar {
+      width: 5px;
+    }
+    #right-drawer::-webkit-scrollbar-thumb {
+      background: var(--surface-border);
+      border-radius: 5px;
+    }
+
+    /* Tabbed navigation inside knowledge drawer */
+    .drawer-tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(2, 6, 23, 0.5);
+      padding: 3px;
+      border-radius: 10px;
+      border: 1px solid var(--surface-border);
+    }
+    .drawer-tab {
+      flex: 1;
+      padding: 6px 4px;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .drawer-tab:hover {
+      color: var(--text);
+    }
+    .drawer-tab.active {
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 0 10px -2px var(--accent-glow);
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 10px;
+    }
+    .drawer-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .drawer-sub {
+      font-size: 12px;
+      color: var(--accent);
+      margin-top: 2px;
+      font-weight: 500;
+    }
+    .close-btn {
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px solid var(--surface-border);
+      color: var(--muted);
+      border-radius: 8px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    .close-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-p {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      margin: 0;
+    }
+
+    .formula-box {
+      background: rgba(2, 6, 23, 0.65);
+      border: 1px solid var(--surface-border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      color: #f1f5f9;
+      margin-bottom: 6px;
+      overflow-x: auto;
+    }
+    .computed-metrics {
+      background: var(--accent-bg);
+      border: 1px solid var(--accent);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12.5px;
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 0 20px -8px var(--accent-glow);
+    }
+    .computed-metrics div {
+      display: flex;
+      justify-content: space-between;
+      font-weight: 500;
+    }
+    .computed-metrics b {
+      color: var(--accent);
+      font-family: monospace;
+    }
+
+    .param-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+    .param-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #e2e8f0;
+    }
+    .param-label b {
+      color: var(--accent);
+      font-family: monospace;
+    }
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: rgba(148, 163, 184, 0.2);
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--accent);
+      border: 2px solid #030712;
+      transition: transform 0.1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.2);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(2, 6, 23, 0.6);
+      border: 1px solid var(--surface-border);
+      border-radius: 10px;
+      margin-top: 6px;
+    }
+    .toggle-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--surface-border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle-btn.on {
+      background: #ef4444;
+      border-color: #ef4444;
+      color: #fff;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.6);
+    }
+
+    .action-trigger-btn {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #030712;
+      background: linear-gradient(135deg, var(--accent), #38bdf8);
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 18px var(--accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: transform 0.1s, box-shadow 0.2s;
+      margin-top: 8px;
+    }
+    .action-trigger-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 25px var(--accent);
+    }
+    .action-trigger-btn:active {
+      transform: translateY(1px);
+    }
+
+    .app-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--surface-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+    .app-card strong {
+      color: var(--accent);
+    }
+
+    /* Bottom Timeline Control Dock */
+    #bottom-dock {
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 50px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .btn {
+      border: 1px solid var(--surface-border);
+      background: rgba(2, 6, 23, 0.6);
+      color: var(--text);
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 12px -3px var(--accent-glow);
+    }
+    .btn.active {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 15px -3px var(--accent-glow);
+    }
+
+    /* Background Music Player Widget (Bottom-Left) */
+    #bg-music-player {
+      position: fixed;
+      bottom: 14px;
+      left: 14px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.85);
+      padding: 10px 14px;
+      color: #ffffff;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(34, 211, 238, 0.35);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 20px -5px rgba(34, 211, 238, 0.25);
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+    #bg-music-player.playing {
+      border-color: var(--accent);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 0 25px -3px var(--accent-glow);
+    }
+
+    .music-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 10px;
+      border-right: 1px solid rgba(148, 163, 184, 0.25);
+    }
+    .music-icon {
+      font-size: 16px;
+      color: var(--muted);
+      transition: color 0.3s, transform 0.3s;
+    }
+    #bg-music-player.playing .music-icon {
+      color: var(--accent);
+      animation: pulse-glow 2s infinite ease-in-out;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent)); }
+      50% { transform: scale(1.15); filter: drop-shadow(0 0 8px var(--accent)); }
+    }
+    .music-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    .audio-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(34, 211, 238, 0.15);
+      color: #22d3ee;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .audio-btn:hover {
+      background: rgba(34, 211, 238, 0.3);
+      transform: scale(1.08);
+    }
+
+    .mute-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      transition: color 0.2s;
+    }
+    .mute-btn:hover {
+      color: #ffffff;
+    }
+
+    .vol-slider {
+      width: 65px;
+      height: 4px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 950px) {
+      #left-drawer { width: 220px; bottom: 74px; }
+      #right-drawer { width: 330px; bottom: 74px; }
+      .music-title { display: none; }
+    }
+    @media (max-width: 700px) {
+      #top-bar { height: auto; padding: 8px; flex-direction: column; gap: 6px; }
+      #left-drawer { top: 84px; width: 170px; bottom: 74px; padding: 10px; }
+      #right-drawer { top: 84px; left: 185px; right: 10px; width: auto; bottom: 74px; }
+      #bg-music-player { left: 8px; bottom: 8px; padding: 6px 10px; gap: 6px; }
+      #bottom-dock { padding: 4px 8px; gap: 4px; }
+      .btn { padding: 5px 8px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL 3D Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Top Status Bar -->
+  <header id="top-bar" class="glass">
+    <div class="brand">
+      <div class="brand-logo">Ψ</div>
+      <div class="brand-title">
+        <span>PhysLab 3D</span>
+        <span class="brand-badge" id="domain-badge">Classical Physics</span>
+      </div>
+    </div>
+    <div class="top-hint" id="top-hint">
+      <span>💡 Select any floating <b>3D Node</b> or choose an experiment from the left menu.</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn" id="btn-reset-cam" title="Return to Orbital Overview">⌂ Overview</button>
+    </div>
+  </header>
+
+  <!-- Left Sidebar / Category Switcher & Search -->
+  <aside id="left-drawer" class="glass">
+    <div class="tab-group">
+      <button class="tab-btn active" id="tab-classical">Classical</button>
+      <button class="tab-btn" id="tab-quantum">Quantum</button>
+    </div>
+
+    <input type="text" id="search-input" class="search-input" placeholder="🔍 Search phenomena..." autocomplete="off" />
+
+    <div class="section-title">Experiments / Thí nghiệm</div>
+    <div class="node-list" id="experiment-list">
+      <!-- Populated dynamically via JS -->
+    </div>
+  </aside>
+
+  <!-- Right Knowledge Panel Drawer -->
+  <aside id="right-drawer" class="glass">
+    <div class="drawer-header">
+      <div>
+        <div class="drawer-title" id="drawer-title">Experiment</div>
+        <div class="drawer-sub" id="drawer-sub">Tên tiếng Việt</div>
+      </div>
+      <button class="close-btn" id="btn-close-drawer" title="Close Panel">✕</button>
+    </div>
+
+    <!-- 4 Tabs as requested: Explanation, Formulas, Laws, Applications -->
+    <div class="drawer-tabs">
+      <button class="drawer-tab active" data-tab="tab-exp">1. Giải thích</button>
+      <button class="drawer-tab" data-tab="tab-math">2. Công thức</button>
+      <button class="drawer-tab" data-tab="tab-laws">3. Quy luật</button>
+      <button class="drawer-tab" data-tab="tab-apps">4. Ứng dụng</button>
+    </div>
+
+    <!-- TAB 1: Explanation -->
+    <div id="content-tab-exp" class="tab-content">
+      <div class="section-title">📖 Phenomenon Explanation / Giải thích hiện tượng</div>
+      <p class="section-p" id="drawer-desc"></p>
+      <div id="drawer-action-container" style="margin-top: 14px;"></div>
+    </div>
+
+    <!-- TAB 2: Formulas & Live Variables -->
+    <div id="content-tab-math" class="tab-content" style="display: none;">
+      <div class="section-title">📐 Mathematical Formulation / Công thức</div>
+      <div id="drawer-formulas"></div>
+      
+      <div class="section-title" style="margin-top: 12px;">📊 Live Calculation / Giá trị tức thời</div>
+      <div class="computed-metrics" id="drawer-metrics"></div>
+
+      <div class="section-title" style="margin-top: 14px;">🎛️ Interactive Variables / Biến số điều khiển</div>
+      <div id="drawer-sliders"></div>
+    </div>
+
+    <!-- TAB 3: Governing Laws & Theorems -->
+    <div id="content-tab-laws" class="tab-content" style="display: none;">
+      <div class="section-title">⚖️ Fundamental Laws / Quy luật cốt lõi</div>
+      <div id="drawer-laws" class="section-p"></div>
+    </div>
+
+    <!-- TAB 4: Real-World Consequences & Applications -->
+    <div id="content-tab-apps" class="tab-content" style="display: none;">
+      <div class="section-title">🚀 Modern Technology & Consequences / Hệ quả & Ứng dụng</div>
+      <div id="drawer-apps"></div>
+    </div>
+  </aside>
+
+  <!-- Bottom-Left Background Music Player Widget -->
+  <div id="bg-music-player">
+    <audio id="html-audio-elem" loop src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=space-ambient-112199.mp3"></audio>
+    <div class="music-brand">
+      <span class="music-icon" id="music-icon">♫</span>
+      <span class="music-title">Background Music</span>
+    </div>
+    <button class="audio-btn" id="btn-music-play" title="Phát / Dừng nhạc">▶</button>
+    <button class="mute-btn" id="btn-music-mute" title="Bật / Tắt tiếng">🔊</button>
+    <input type="range" min="0" max="1" step="0.01" value="0.5" class="vol-slider" id="music-vol-slider" title="Âm lượng" />
+  </div>
+
+  <!-- Bottom Timeline Playback Control Dock -->
+  <footer id="bottom-dock" class="glass">
+    <button class="btn" id="btn-play-pause">⏸ Pause</button>
+    <button class="btn" id="btn-slow-mo">⏱ Slow ¼×</button>
+    <button class="btn" id="btn-step-fwd">⏭ Step</button>
+    <button class="btn" id="btn-restart">↺ Reset Sim</button>
+  </footer>
+
+  <script>
+    /* =========================================================================
+       AUDIO ENGINE: BACKGROUND SOUNDSCAPE & SYNTHESIZER
+       ========================================================================= */
+    class SpaceSoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.synthNodes = null;
+        this.isPlaying = false;
+        this.isMuted = false;
+        this.volume = 0.5;
+        this.audioEl = document.getElementById('html-audio-elem');
+      }
+
+      initContext() {
+        if (!this.ctx && (window.AudioContext || window.webkitAudioContext)) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+
+      startAmbientSynth() {
+        if (this.synthNodes) return;
+        this.initContext();
+        if (!this.ctx) return;
+
+        try {
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          const filter = this.ctx.createBiquadFilter();
+          const gain = this.ctx.createGain();
+
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(110, this.ctx.currentTime); // A2 drone
+
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(164.81, this.ctx.currentTime); // E3 overtone
+
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(320, this.ctx.currentTime);
+
+          gain.gain.setValueAtTime(this.isMuted ? 0 : this.volume * 0.12, this.ctx.currentTime);
+
+          osc1.connect(filter);
+          osc2.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc1.start();
+          osc2.start();
+
+          this.synthNodes = { osc1, osc2, filter, gain };
+        } catch (e) {
+          console.warn('Synth startup error:', e);
+        }
+      }
+
+      stopAmbientSynth() {
+        if (!this.synthNodes) return;
+        try {
+          this.synthNodes.gain.gain.setValueAtTime(0, this.ctx.currentTime);
+          this.synthNodes.osc1.stop();
+          this.synthNodes.osc2.stop();
+        } catch (e) {}
+        this.synthNodes = null;
+      }
+
+      togglePlay() {
+        this.initContext();
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+
+        this.isPlaying = !this.isPlaying;
+        const playBtn = document.getElementById('btn-music-play');
+        const container = document.getElementById('bg-music-player');
+
+        if (this.isPlaying) {
+          playBtn.textContent = '⏸';
+          container.classList.add('playing');
+          // Try playing html audio stream
+          if (this.audioEl) {
+            this.audioEl.volume = this.isMuted ? 0 : this.volume;
+            this.audioEl.play().catch(() => {
+              // Fallback to pure synthesized ambient drone if network/autoplay restricts
+              this.startAmbientSynth();
+            });
+          } else {
+            this.startAmbientSynth();
+          }
+        } else {
+          playBtn.textContent = '▶';
+          container.classList.remove('playing');
+          if (this.audioEl) this.audioEl.pause();
+          this.stopAmbientSynth();
+        }
+      }
+
+      setVolume(val) {
+        this.volume = val;
+        if (this.audioEl) this.audioEl.volume = this.isMuted ? 0 : val;
+        if (this.synthNodes && this.ctx) {
+          this.synthNodes.gain.gain.setValueAtTime(this.isMuted ? 0 : val * 0.12, this.ctx.currentTime);
+        }
+      }
+
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        const muteBtn = document.getElementById('btn-music-mute');
+        muteBtn.textContent = this.isMuted || this.volume === 0 ? '🔇' : '🔊';
+        this.setVolume(this.volume);
+      }
+
+      // Short SFX tones
+      playSFX(freq = 520, type = 'sine', duration = 0.08, gainVal = 0.08) {
+        this.initContext();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(gainVal, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + duration);
+        } catch (e) {}
+      }
+
+      hover() { this.playSFX(880, 'sine', 0.04, 0.03); }
+      click() { this.playSFX(587.33, 'triangle', 0.12, 0.08); }
+      switchDomain() { this.playSFX(659.25, 'sawtooth', 0.16, 0.05); }
+      trigger() { this.playSFX(350, 'square', 0.15, 0.07); }
+    }
+
+    const sound = new SpaceSoundEngine();
+
+    // Hook up Music Player UI controls
+    document.getElementById('btn-music-play').onclick = () => sound.togglePlay();
+    document.getElementById('btn-music-mute').onclick = () => sound.toggleMute();
+    document.getElementById('music-vol-slider').oninput = (e) => {
+      sound.setVolume(parseFloat(e.target.value));
+      if (sound.isMuted) sound.toggleMute();
+    };
+
+    /* =========================================================================
+       THREE.JS SETUP & SCENE ENVIRONMENT
+       ========================================================================= */
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x030712);
+
+    const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const HOME_CAM_POS = new THREE.Vector3(0, 14, 30);
+    const HOME_CAM_TARGET = new THREE.Vector3(0, 0, 0);
+    camera.position.copy(HOME_CAM_POS);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 3;
+    controls.maxDistance = 110;
+    controls.target.copy(HOME_CAM_TARGET);
+
+    // Deep space starry backdrop
+    {
+      const starGeo = new THREE.BufferGeometry();
+      const coords = [];
+      for (let i = 0; i < 4500; i++) {
+        coords.push(
+          (Math.random() - 0.5) * 550,
+          (Math.random() - 0.5) * 550,
+          (Math.random() - 0.5) * 550
+        );
+      }
+      starGeo.setAttribute('position', new THREE.Float32BufferAttribute(coords, 3));
+      scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ size: 0.8, color: 0x94a3b8, transparent: true, opacity: 0.65 })));
+    }
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.25);
+    dirLight.position.set(15, 30, 20);
+    scene.add(dirLight);
+
+    const centerCore = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(2.0, 1),
+      new THREE.MeshBasicMaterial({ wireframe: true, color: 0xfbbf24, transparent: true, opacity: 0.35 })
+    );
+    scene.add(centerCore);
+
+    /* =========================================================================
+       GRAPHICS UTILITIES
+       ========================================================================= */
+    const createGlowTexture = () => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.25, 'rgba(255,255,255,0.4)');
+      g.addColorStop(0.6, 'rgba(255,255,255,0.1)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(c);
+    };
+    const glowTex = createGlowTexture();
+
+    const makeGlowSprite = (colorHex, scale = 5) => {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glowTex,
+        color: colorHex,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        opacity: 0.7,
+        depthWrite: false
+      }));
+      sp.scale.set(scale, scale, 1);
+      return sp;
+    };
+
+    const makeTextSprite = (text, sub = '') => {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.font = 'bold 36px -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffffff';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 8;
+      ctx.fillText(text, 256, 50);
+
+      if (sub) {
+        ctx.font = '22px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(sub, 256, 90);
+      }
+
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(c),
+        transparent: true,
+        depthTest: false
+      }));
+      sp.scale.set(7, 1.75, 1);
+      sp.position.y = -1.6;
+      return sp;
+    };
+
+    const makeArrow = (colorHex) => {
+      return new THREE.ArrowHelper(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 0), 1, colorHex, 0.45, 0.28);
+    };
+
+    const updateArrow = (arrow, origin, vec, scaleMult = 0.25) => {
+      const len = vec.length() * scaleMult;
+      if (len < 0.05) {
+        arrow.visible = false;
+        return;
+      }
+      arrow.visible = true;
+      arrow.position.copy(origin);
+      arrow.setDirection(vec.clone().normalize());
+      arrow.setLength(len, Math.min(0.5, len * 0.4), 0.25);
+    };
+
+    const makeLine = (maxPoints, colorHex, opacity = 0.8) => {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(maxPoints * 3), 3));
+      const line = new THREE.Line(geo, new THREE.LineBasicMaterial({
+        color: colorHex,
+        transparent: true,
+        opacity,
+        blending: THREE.AdditiveBlending
+      }));
+      line.frustumCulled = false;
+      return line;
+    };
+
+    const updateLinePoints = (line, points) => {
+      const attr = line.geometry.attributes.position;
+      for (let i = 0; i < points.length; i++) {
+        attr.setXYZ(i, points[i].x, points[i].y, points[i].z);
+      }
+      line.geometry.setDrawRange(0, points.length);
+      attr.needsUpdate = true;
+    };
+
+    /* =========================================================================
+       COMPLETE CATALOG OF 12 LANDMARK PHYSICS EXPERIMENTS
+       ========================================================================= */
+    const EXPERIMENTS = [
+      // =======================================================================
+      // CLASSICAL PHYSICS (VẬT LÝ CỔ ĐIỂN)
+      // =======================================================================
+      
+      // 1. Galileo's Leaning Tower Experiment (NEW!)
+      {
+        id: 'galileo',
+        domain: 'classical',
+        name: "Galileo's Leaning Tower",
+        nameVi: "Thí nghiệm Rơi tự do của Galileo",
+        cameraPos: [0, 10, 24],
+        cameraTarget: [0, 5, 0],
+        desc: "Galileo Galilei thả đồng thời hai quả cầu có khối lượng chênh lệch lớn từ đỉnh tháp nghiêng Pisa. Trái với quan niệm 2000 năm của Aristotle rằng vật nặng hơn rơi nhanh hơn, Galileo chứng minh trong chân không mọi vật đều rơi với cùng một gia tốc trọng trường g.",
+        formulas: [
+          's(t) = \\frac{1}{2} g t^2 \\implies t = \\sqrt{\\frac{2h}{g}}',
+          'v(t) = g t = \\sqrt{2gh}',
+          'F_{\\text{net}} = m g - \\frac{1}{2} C_d \\rho A v^2',
+          'v_{\\text{terminal}} = \\sqrt{\\frac{2mg}{C_d \\rho A}}'
+        ],
+        laws: [
+          'Nguyên lý Tương đương (Equivalence Principle): Khối lượng quán tính bằng đúng khối lượng hấp dẫn (m_i = m_g).',
+          'Gia tốc rơi tự do trong chân không không phụ thuộc vào khối lượng, hình dạng hay thành phần cấu tạo của vật.',
+          'Định luật Vạn vật Hấp dẫn của Newton: F = G(M·m)/R².'
+        ],
+        apps: [
+          '<strong>Chinh phục Mặt Trăng (Apollo 15):</strong> Phi hành gia David Scott thả đồng thời một chiếc búa và một chiếc lông chim trên Mặt Trăng, cả hai chạm đất cùng một thời điểm hoàn hảo.',
+          '<strong>Nhảy dù và Khí động học:</strong> Tối ưu hóa hệ số cản Cd và diện tích cản gió để kiểm soát vận tốc giới hạn khi rơi tự do.',
+          '<strong>Đo đạc Địa chất Chính xác:</strong> Ống rơi tự do chân không dùng laser giao thoa để đo gia tốc g tới 9 chữ số thập phân.'
+        ],
+        params: [
+          { key: 'm1', label: 'Khối lượng Quả Cầu 1 (Sắt)', min: 5, max: 50, step: 1, default: 20, unit: ' kg' },
+          { key: 'm2', label: 'Khối lượng Quả Cầu 2 (Gỗ/Lông)', min: 0.1, max: 10, step: 0.1, default: 1.0, unit: ' kg' },
+          { key: 'drag', label: 'Lực cản Khí quyển (Cd·ρ)', min: 0, max: 1.5, step: 0.05, default: 0.2, unit: '' },
+          { key: 'height', label: 'Độ cao tháp thả h', min: 8, max: 16, step: 1, default: 12, unit: ' m' }
+        ],
+        compute: (P) => {
+          const t_vac = Math.sqrt((2 * P.height) / 9.81);
+          return [
+            { label: 'Thời gian rơi trong chân không', val: t_vac.toFixed(2) + ' s' },
+            { label: 'Trạng thái môi trường', val: P.drag === 0 ? 'Chân không tuyệt đối (Rơi đồng thời)' : 'Khí quyển có lực cản (Vật nặng rơi trước)' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          parent.add(group);
+
+          // Leaning Tower Architecture
+          const tower = new THREE.Group();
+          tower.position.set(-6, 0, 0);
+          tower.rotation.z = -0.07; // slight lean
+          group.add(tower);
+
+          for (let tier = 0; tier < 4; tier++) {
+            const hTier = 3.2;
+            const cyl = new THREE.Mesh(
+              new THREE.CylinderGeometry(2.2 - tier * 0.15, 2.4 - tier * 0.15, hTier, 16, 1, true),
+              new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.7 })
+            );
+            cyl.position.y = tier * hTier + hTier / 2;
+            tower.add(cyl);
+          }
+
+          // Balcony platform
+          const platform = new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, 2.5), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+          platform.position.set(0.8, 12, 0);
+          tower.add(platform);
+
+          // Balls
+          const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.48, 20, 20), new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.8, roughness: 0.2 }));
+          b1.add(makeGlowSprite(0x38bdf8, 2.0));
+          const b2 = new THREE.Mesh(new THREE.SphereGeometry(0.35, 20, 20), new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.2, roughness: 0.8 }));
+          b2.add(makeGlowSprite(0xfbbf24, 2.0));
+          group.add(b1);
+          group.add(b2);
+
+          let y1 = 12, y2 = 12, v1 = 0, v2 = 0;
+
+          const reset = () => {
+            y1 = P.height;
+            y2 = P.height;
+            v1 = 0;
+            v2 = 0;
+            b1.position.set(-3.5, y1, 1.2);
+            b2.position.set(-3.5, y2, -1.2);
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              const g = 9.81;
+              const a1 = g - (P.drag * (v1 * v1) * 0.04) / P.m1;
+              const a2 = g - (P.drag * (v2 * v2) * 0.04) / P.m2;
+
+              if (y1 > 0.48) {
+                v1 += a1 * dt;
+                y1 = Math.max(0.48, y1 - v1 * dt);
+              }
+              if (y2 > 0.35) {
+                v2 += a2 * dt;
+                y2 = Math.max(0.35, y2 - v2 * dt);
+              }
+
+              b1.position.y = y1;
+              b2.position.y = y2;
+
+              if (y1 <= 0.48 && y2 <= 0.35) {
+                // Pause and auto-cycle
+                setTimeout(reset, 1200);
+              }
+            }
+          };
+        }
+      },
+
+      // 2. Young's Double-Slit Optical Wave Interference (NEW!)
+      {
+        id: 'young_slit',
+        domain: 'classical',
+        name: "Young's Optical Wave Interference",
+        nameVi: "Giao thoa Sóng Ánh sáng Young",
+        cameraPos: [0, 9, 25],
+        cameraTarget: [0, 3, 0],
+        desc: "Thí nghiệm lịch sử năm 1801 của Thomas Young đặt nền móng vững chắc cho Thuyết Sóng Ánh sáng. Ánh sáng đơn sắc đi qua hai khe hẹp trở thành hai nguồn sóng kết hợp; sự giao thoa tăng cường và triệt tiêu tạo nên các dải vân sáng và tối xen kẽ.",
+        formulas: [
+          'i = \\frac{\\lambda D}{a} \\quad (Khoảng\\ vân\\ giao\\ thoa)',
+          'x_k = k \\frac{\\lambda D}{a} \\quad (Vân\\ sáng\\ bậc\\ k)',
+          'x_m = (m + 0.5) \\frac{\\lambda D}{a} \\quad (Vân\\ tối)',
+          'I(x) = 4 I_0 \\cos^2\\left(\\frac{\\pi a x}{\\lambda D}\\right)'
+        ],
+        laws: [
+          'Nguyên lý Chồng chập Sóng: Khi hai sóng kết hợp gặp nhau, dao động sáng tổng hợp là tổng véc-tơ các dao động thành phần.',
+          'Điều kiện giao thoa cực đại: Hiệu quang trình d₂ − d₁ = kλ (hai sóng cùng pha).',
+          'Hiệu quang trình cực tiểu: d₂ − d₁ = (k + 0.5)λ (hai sóng ngược pha hoàn toàn).'
+        ],
+        apps: [
+          '<strong>Lớp phủ Chống phản xạ (Anti-Reflective Coating):</strong> Ứng dụng giao thoa màng mỏng trên ống kính máy ảnh và kính mắt quang học.',
+          '<strong>Đo độ dày Màng mỏng Cực nhạy:</strong> Kiểm tra độ phẳng bề mặt silicon trong công nghiệp vi mạch bán dẫn.',
+          '<strong>Giao thoa kế Laser LIGO:</strong> Đo sóng hấp dẫn với độ dịch chuyển pha nhỏ hơn 1/10.000 kích thước hạt proton.'
+        ],
+        params: [
+          { key: 'waveNm', label: 'Bước sóng ánh sáng λ', min: 400, max: 700, step: 20, default: 532, unit: ' nm' },
+          { key: 'slitA', label: 'Khoảng cách 2 khe a', min: 0.8, max: 3.5, step: 0.1, default: 1.8, unit: ' mm' },
+          { key: 'distD', label: 'Khoảng cách tới màn D', min: 8, max: 15, step: 0.5, default: 10, unit: ' m' }
+        ],
+        compute: (P) => {
+          const lambda_m = P.waveNm * 1e-9;
+          const a_m = P.slitA * 1e-3;
+          const i_mm = ((lambda_m * P.distD) / a_m) * 1000;
+          return [
+            { label: 'Khoảng vân giao thoa (i)', val: i_mm.toFixed(2) + ' mm' },
+            { label: 'Màu ánh sáng laser', val: P.waveNm < 450 ? 'Tím (Violet)' : P.waveNm < 500 ? 'Lam (Cyan)' : P.waveNm < 570 ? 'Lục (Green)' : 'Đỏ (Red)' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 3.5;
+          parent.add(group);
+
+          // Laser Emitter
+          const laser = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, 1.4, 16), new THREE.MeshStandardMaterial({ color: 0x334155 }));
+          laser.rotation.z = Math.PI / 2;
+          laser.position.x = -11;
+          group.add(laser);
+
+          // Slit Barrier
+          const slitWall = new THREE.Group();
+          group.add(slitWall);
+
+          // Detection Screen
+          const screen = new THREE.Mesh(new THREE.BoxGeometry(0.2, 14, 8), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 }));
+          screen.position.x = 10;
+          group.add(screen);
+
+          // Wave interference grid
+          const waveRings = new THREE.Group();
+          group.add(waveRings);
+
+          const getHexColor = (nm) => {
+            if (nm < 460) return 0x8b5cf6;
+            if (nm < 510) return 0x06b6d4;
+            if (nm < 580) return 0x10b981;
+            return 0xef4444;
+          };
+
+          const fringes = makeLine(300, getHexColor(P.waveNm), 0.95);
+          group.add(fringes);
+
+          const reset = () => {
+            while (slitWall.children.length) slitWall.remove(slitWall.children[0]);
+            const d = P.slitA;
+            const w = 0.4;
+            [[-7, -d / 2 - w / 2], [-d / 2 + w / 2, d / 2 - w / 2], [d / 2 + w / 2, 7]].forEach(([y0, y1]) => {
+              const block = new THREE.Mesh(new THREE.BoxGeometry(0.3, y1 - y0, 6), new THREE.MeshStandardMaterial({ color: 0x475569 }));
+              block.position.y = (y0 + y1) / 2;
+              slitWall.add(block);
+            });
+
+            // Rebuild intensity curve on screen
+            const pts = [];
+            const color = getHexColor(P.waveNm);
+            fringes.material.color.setHex(color);
+
+            const L = P.distD;
+            const a = P.slitA;
+            const lambda = P.waveNm * 0.001; // relative scale
+
+            for (let i = 0; i < 280; i++) {
+              const y = ((i - 140) / 140) * 6.5;
+              const phase = (Math.PI * a * y) / (lambda * L);
+              const intensity = Math.cos(phase) ** 2;
+              pts.push(new THREE.Vector3(9.88, y, intensity * 2.2));
+            }
+            updateLinePoints(fringes, pts);
+          };
+
+          return {
+            reset,
+            update: (dt) => {}
+          };
+        }
+      },
+
+      // 3. Projectile Motion
+      {
+        id: 'projectile',
+        domain: 'classical',
+        name: 'Projectile Motion',
+        nameVi: 'Chuyển động ném xiên',
+        cameraPos: [0, 10, 24],
+        cameraTarget: [0, 4, 0],
+        desc: 'Vật được phóng với vận tốc ban đầu v₀ dưới góc nghiêng θ. Vận tốc theo phương ngang không đổi, trong khi trọng trường gia tốc chuyển động theo phương thẳng đứng, tạo nên quỹ đạo parabol kinh điển.',
+        formulas: [
+          'x(t) = v_0 \\cdot \\cos\\theta \\cdot t',
+          'y(t) = v_0 \\cdot \\sin\\theta \\cdot t - \\frac{1}{2}g t^2',
+          'R = \\frac{v_0^2 \\sin(2\\theta)}{g} \\quad (Tầm\\ xa)',
+          'H = \\frac{v_0^2 \\sin^2\\theta}{2g} \\quad (Độ\\ cao\\ cực\\ đại)'
+        ],
+        laws: [
+          'Định luật II Newton (F = ma): Chỉ có trọng lực tác dụng, gia tốc a = g hướng xuống.',
+          'Nguyên lý độc lập chuyển động: Các thành phần vx và vy biến đổi độc lập.',
+          'Bảo toàn cơ năng: E = ½mv² + mgy = hằng số.'
+        ],
+        apps: [
+          '<strong>Đường đạn và Thể thao:</strong> Góc phóng 45° tối ưu hóa tầm xa trên mặt đất bằng phẳng.',
+          '<strong>Phóng Tên lửa & Vệ tinh:</strong> Quỹ đạo đưa tàu thăm dò vượt tầng khí quyển.',
+          '<strong>Kiến trúc Đài phun nước:</strong> Tính toán vòi phun nghệ thuật.'
+        ],
+        params: [
+          { key: 'v0', label: 'Vận tốc ban đầu v₀', min: 8, max: 35, step: 1, default: 20, unit: ' m/s' },
+          { key: 'theta', label: 'Góc bắn θ', min: 15, max: 75, step: 1, default: 45, unit: '°' },
+          { key: 'gravity', label: 'Gia tốc trọng trường g', min: 1.6, max: 25, step: 0.1, default: 9.8, unit: ' m/s²' }
+        ],
+        compute: (P) => {
+          const rad = (P.theta * Math.PI) / 180;
+          const vy = P.v0 * Math.sin(rad);
+          const range = (P.v0 * P.v0 * Math.sin(2 * rad)) / P.gravity;
+          const height = (vy * vy) / (2 * P.gravity);
+          const flightTime = (2 * vy) / P.gravity;
+          return [
+            { label: 'Tầm xa (R)', val: range.toFixed(1) + ' m' },
+            { label: 'Độ cao cực đại (H)', val: height.toFixed(1) + ' m' },
+            { label: 'Thời gian bay (T)', val: flightTime.toFixed(2) + ' s' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          parent.add(group);
+
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.38, 20, 20), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+          ball.add(makeGlowSprite(0xfbbf24, 2.5));
+          group.add(ball);
+
+          const velArrow = makeArrow(0x34d399);
+          const gravArrow = makeArrow(0xf87171);
+          group.add(velArrow);
+          group.add(gravArrow);
+
+          const trajLine = makeLine(80, 0x64748b, 0.7);
+          group.add(trajLine);
+
+          let t = 0, vx, vy, Tflight, scale;
+
+          const reset = () => {
+            const rad = (P.theta * Math.PI) / 180;
+            vx = P.v0 * Math.cos(rad);
+            vy = P.v0 * Math.sin(rad);
+            Tflight = (2 * vy) / P.gravity;
+            scale = Math.min(22 / (vx * Tflight), 9 / ((vy * vy) / (2 * P.gravity)));
+            t = 0;
+            const pts = [];
+            for (let i = 0; i <= 60; i++) {
+              const ti = (Tflight * i) / 60;
+              pts.push(new THREE.Vector3(-11 + vx * ti * scale, (vy * ti - 0.5 * P.gravity * ti * ti) * scale, 0));
+            }
+            updateLinePoints(trajLine, pts);
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              t = (t + dt) % (Tflight + 0.6);
+              const ti = Math.min(t, Tflight);
+              const pos = new THREE.Vector3(-11 + vx * ti * scale, (vy * ti - 0.5 * P.gravity * ti * ti) * scale, 0);
+              ball.position.copy(pos);
+              updateArrow(velArrow, pos, new THREE.Vector3(vx, vy - P.gravity * ti, 0), 0.14);
+              updateArrow(gravArrow, pos, new THREE.Vector3(0, -P.gravity, 0), 0.22);
+            }
+          };
+        }
+      },
+
+      // 4. Harmonic Pendulum & Resonance
+      {
+        id: 'pendulum',
+        domain: 'classical',
+        name: 'Harmonic Pendulum',
+        nameVi: 'Con lắc đơn & Dao động',
+        cameraPos: [0, 8, 24],
+        cameraTarget: [0, 5, 0],
+        desc: 'Vật nặng treo dưới sợi dây dao động dưới tác dụng của trọng lực. Với góc lệch nhỏ, con lắc dao động điều hòa tự do với chu kỳ T₀ không đổi.',
+        formulas: [
+          '\\frac{d^2\\theta}{dt^2} + \\frac{g}{L} \\sin\\theta = 0',
+          'T_0 = 2\\pi \\sqrt{\\frac{L}{g}} \\quad (\\theta_0 \\ll 1)',
+          'E = \\frac{1}{2} m L^2 \\dot{\\theta}^2 + mgL(1 - \\cos\\theta)'
+        ],
+        laws: [
+          'Định luật bảo toàn cơ năng trong trường trọng lực.',
+          'Gần đúng góc nhỏ: sinθ ≈ θ đưa phương trình vi phân phi tuyến về dao động điều hòa bậc hai.',
+          'Hiện tượng cộng hưởng: Dao động cưỡng bức đạt biên độ cực đại khi tần số kích thích f = f₀.'
+        ],
+        apps: [
+          '<strong>Khối Giảm chấn Taipei 101:</strong> Triệt tiêu dao động gió bão cho tòa nhà chọc trời.',
+          '<strong>Đồng hồ quả lắc:</strong> Tiêu chuẩn giữ nhịp thời gian kinh điển.',
+          '<strong>Khảo sát Trọng lực:</strong> Đo lường gia tốc g trên bề mặt hành tinh.'
+        ],
+        params: [
+          { key: 'length', label: 'Chiều dài dây L', min: 1, max: 5, step: 0.1, default: 2.2, unit: ' m' },
+          { key: 'angle0', label: 'Góc thả ban đầu θ₀', min: 10, max: 80, step: 1, default: 35, unit: '°' },
+          { key: 'gravity', label: 'Trọng trường g', min: 1.6, max: 25, step: 0.1, default: 9.8, unit: ' m/s²' }
+        ],
+        compute: (P) => {
+          const t0 = (P.angle0 * Math.PI) / 180;
+          const T0 = 2 * Math.PI * Math.sqrt(P.length / P.gravity);
+          const T_corrected = T0 * (1 + (t0 * t0) / 16);
+          const vmax = Math.sqrt(2 * P.gravity * P.length * (1 - Math.cos(t0)));
+          return [
+            { label: 'Chu kỳ góc nhỏ T₀', val: T0.toFixed(2) + ' s' },
+            { label: 'Chu kỳ hiệu chỉnh T', val: T_corrected.toFixed(2) + ' s' },
+            { label: 'Vận tốc cực đại vmax', val: vmax.toFixed(2) + ' m/s' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 11;
+          parent.add(group);
+
+          const pivot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.4, 16), new THREE.MeshBasicMaterial({ color: 0x94a3b8 }));
+          pivot.rotation.x = Math.PI / 2;
+          group.add(pivot);
+
+          const rod = makeLine(2, 0xcbd5e1, 0.9);
+          const trail = makeLine(300, 0xfbbf24, 0.5);
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 24), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+          ball.add(makeGlowSprite(0xfbbf24, 3.2));
+          const velArrow = makeArrow(0x34d399);
+
+          group.add(rod);
+          group.add(trail);
+          group.add(ball);
+          group.add(velArrow);
+
+          let theta, omega, trailPts = [];
+
+          const reset = () => {
+            theta = (P.angle0 * Math.PI) / 180;
+            omega = 0;
+            trailPts = [];
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              const subSteps = 12;
+              const h = dt / subSteps;
+              for (let i = 0; i < subSteps; i++) {
+                omega -= (P.gravity / P.length) * Math.sin(theta) * h;
+                theta += omega * h;
+              }
+              const effL = P.length * 2.0;
+              const pos = new THREE.Vector3(effL * Math.sin(theta), -effL * Math.cos(theta), 0);
+              ball.position.copy(pos);
+              updateLinePoints(rod, [new THREE.Vector3(0, 0, 0), pos]);
+
+              trailPts.push(pos.clone());
+              if (trailPts.length > 280) trailPts.shift();
+              updateLinePoints(trail, trailPts);
+
+              const velTan = new THREE.Vector3(Math.cos(theta), Math.sin(theta), 0).multiplyScalar(omega * effL);
+              updateArrow(velArrow, pos, velTan, 0.25);
+            }
+          };
+        }
+      },
+
+      // 5. Planetary Orbits (Kepler)
+      {
+        id: 'kepler',
+        domain: 'classical',
+        name: 'Planetary Orbits',
+        nameVi: 'Quỹ đạo hành tinh (Kepler)',
+        cameraPos: [0, 18, 22],
+        cameraTarget: [0, 2, 0],
+        desc: 'Hành tinh di chuyển trong trường hấp dẫn nghịch đảo bình phương khoảng cách của một ngôi sao trung tâm theo 3 định luật Kepler.',
+        formulas: [
+          'F_g = G \\frac{M m}{r^2}',
+          'v^2 = GM \\left(\\frac{2}{r} - \\frac{1}{a}\\right) \\quad (Vis-viva)',
+          'T^2 = \\frac{4\\pi^2}{GM} a^3 \\quad (Định\\ luật\\ III\\ Kepler)',
+          'L = m (\\vec{r} \\times \\vec{v}) = \\text{hằng số}'
+        ],
+        laws: [
+          'Kepler I: Quỹ đạo các hành tinh là đường elip với ngôi sao nằm tại một tiêu điểm.',
+          'Kepler II: Bán kính quét quét những diện tích bằng nhau trong các khoảng thời gian bằng nhau.',
+          'Kepler III: Bình phương chu kỳ tỷ lệ với lập phương bán trục lớn (T² ∝ a³).'
+        ],
+        apps: [
+          '<strong>Định vị GPS & Vệ tinh địa tĩnh:</strong> Chu kỳ 24h đồng bộ vòng quay Trái Đất.',
+          '<strong>Quỹ đạo Hohmann:</strong> Tiết kiệm nhiên liệu phóng tàu vũ trụ thám hiểm Sao Hỏa.',
+          '<strong>Cân khối lượng Thiên thể:</strong> Đo chu kỳ và bán kính quỹ đạo để tính khối lượng lỗ đen.'
+        ],
+        params: [
+          { key: 'starMass', label: 'Khối lượng Sao M', min: 0.6, max: 2.2, step: 0.1, default: 1.0, unit: ' M☉' },
+          { key: 'radius', label: 'Bán kính xuất phát r₀', min: 4.5, max: 8.5, step: 0.1, default: 6.5, unit: ' AU' },
+          { key: 'speedRatio', label: 'Vận tốc phóng (% tròn)', min: 0.7, max: 1.3, step: 0.02, default: 0.85, unit: '×' }
+        ],
+        compute: (P) => {
+          const GM = P.starMass * 65;
+          const v_circ = Math.sqrt(GM / P.radius);
+          const v0 = P.speedRatio * v_circ;
+          const a = P.radius / (2 - (v0 * v0 * P.radius) / GM);
+          const T = 2 * Math.PI * Math.sqrt(Math.abs(a ** 3) / GM);
+          return [
+            { label: 'Vận tốc tròn v_circ', val: v_circ.toFixed(2) + ' km/s' },
+            { label: 'Bán trục lớn a', val: a.toFixed(2) + ' AU' },
+            { label: 'Chu kỳ quỹ đạo T', val: T.toFixed(1) + ' s' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 2;
+          parent.add(group);
+
+          const star = new THREE.Mesh(new THREE.SphereGeometry(1.2, 24, 24), new THREE.MeshBasicMaterial({ color: 0xfde047 }));
+          star.add(makeGlowSprite(0xfde047, 6));
+          group.add(star);
+
+          const planet = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 20), new THREE.MeshBasicMaterial({ color: 0x60a5fa }));
+          planet.add(makeGlowSprite(0x60a5fa, 2.6));
+          group.add(planet);
+
+          const orbitTrail = makeLine(500, 0x60a5fa, 0.65);
+          const radiusLine = makeLine(2, 0xf87171, 0.85);
+          const velArrow = makeArrow(0x34d399);
+
+          group.add(orbitTrail);
+          group.add(radiusLine);
+          group.add(velArrow);
+
+          let x, z, vx, vz, trailPts = [];
+          const getGM = () => P.starMass * 65;
+
+          const reset = () => {
+            x = P.radius;
+            z = 0;
+            vx = 0;
+            vz = P.speedRatio * Math.sqrt(getGM() / P.radius);
+            trailPts = [];
+          };
+
+          const getAcc = (px, pz) => {
+            const dist = Math.hypot(px, pz);
+            const force = -getGM() / (dist * dist * dist);
+            return [force * px, force * pz];
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              const subSteps = 30;
+              const h = dt / subSteps;
+              for (let i = 0; i < subSteps; i++) {
+                let [ax, az] = getAcc(x, z);
+                vx += ax * (h / 2);
+                vz += az * (h / 2);
+                x += vx * h;
+                z += vz * h;
+                [ax, az] = getAcc(x, z);
+                vx += ax * (h / 2);
+                vz += az * (h / 2);
+              }
+
+              const pos = new THREE.Vector3(x, 0, z);
+              planet.position.copy(pos);
+              updateLinePoints(radiusLine, [new THREE.Vector3(0, 0, 0), pos]);
+
+              trailPts.push(pos.clone());
+              if (trailPts.length > 480) trailPts.shift();
+              updateLinePoints(orbitTrail, trailPts);
+
+              updateArrow(velArrow, pos, new THREE.Vector3(vx, 0, vz), 0.35);
+            }
+          };
+        }
+      },
+
+      // 6. Lorentz Force
+      {
+        id: 'lorentz',
+        domain: 'classical',
+        name: 'Lorentz Force',
+        nameVi: 'Lực Lorentz & Từ trường',
+        cameraPos: [0, 10, 26],
+        cameraTarget: [0, 4, 0],
+        desc: 'Hạt mang điện tích q chuyển động trong từ trường đều B chịu tác dụng của lực từ vuông góc với cả vector vận tốc v và vector từ trường B. Hạt chuyển động theo đường xoắn ốc (helix).',
+        formulas: [
+          '\\vec{F} = q (\\vec{E} + \\vec{v} \\times \\vec{B})',
+          'r = \\frac{m v_\\perp}{q B} \\quad (Bán\\ kính\\ Larmor)',
+          '\\omega_c = \\frac{q B}{m} \\quad (Tần\\ số\\ Cyclotron)'
+        ],
+        laws: [
+          'Quy tắc bàn tay phải xác định phương chiều của lực từ F.',
+          'Lực từ không sinh công: F ⊥ v nên tốc độ và động năng được bảo toàn.',
+          'Hạt chuyển động thẳng đều dọc theo đường sức từ và quay tròn đều trên mặt phẳng vuông góc.'
+        ],
+        apps: [
+          '<strong>Máy gia tốc Hạt LHC (CERN):</strong> Bẻ cong chùm proton với nam châm siêu dẫn.',
+          '<strong>Khối phổ kế (Mass Spectrometer):</strong> Tách biệt các đồng vị theo m/q.',
+          '<strong>Lò phản ứng nhiệt hạch Tokamak:</strong> Giam giữ plasma bằng từ trường xoắn.'
+        ],
+        params: [
+          { key: 'vPerp', label: 'Vận tốc vuông góc v⊥', min: 1.5, max: 4.5, step: 0.1, default: 2.8, unit: ' c/10' },
+          { key: 'bField', label: 'Cường độ từ trường B', min: 0.6, max: 2.5, step: 0.1, default: 1.2, unit: ' T' },
+          { key: 'vParallel', label: 'Vận tốc dọc trục v∥', min: 0.2, max: 2.5, step: 0.1, default: 0.9, unit: ' c/10' }
+        ],
+        compute: (P) => {
+          const radius = P.vPerp / P.bField;
+          const omega = P.bField;
+          const period = (2 * Math.PI) / omega;
+          const pitch = P.vParallel * period;
+          return [
+            { label: 'Bán kính Larmor (r)', val: radius.toFixed(2) + ' m' },
+            { label: 'Chu kỳ quay (T)', val: period.toFixed(2) + ' s' },
+            { label: 'Bước xoắn (Pitch)', val: pitch.toFixed(2) + ' m' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 5;
+          parent.add(group);
+
+          for (let ix = -2; ix <= 2; ix++) {
+            for (let iy = -2; iy <= 2; iy++) {
+              const bArr = makeArrow(0x38bdf8);
+              bArr.position.set(ix * 3, iy * 2.8, -9);
+              bArr.setDirection(new THREE.Vector3(0, 0, 1));
+              bArr.setLength(2.2, 0.45, 0.25);
+              group.add(bArr);
+            }
+          }
+
+          const chargeBall = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({ color: 0xf472b6 }));
+          chargeBall.add(makeGlowSprite(0xf472b6, 2.5));
+          group.add(chargeBall);
+
+          const helixTrail = makeLine(600, 0xf472b6, 0.85);
+          const velArrow = makeArrow(0x34d399);
+          const forceArrow = makeArrow(0xf87171);
+
+          group.add(helixTrail);
+          group.add(velArrow);
+          group.add(forceArrow);
+
+          let t = 0, trailPts = [];
+
+          const reset = () => {
+            t = 0;
+            trailPts = [];
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              t += dt;
+              if (-9 + P.vParallel * t > 9) {
+                t = 0;
+                trailPts = [];
+              }
+              const w = P.bField;
+              const R = P.vPerp / w;
+              const pos = new THREE.Vector3(R * Math.sin(w * t), R * Math.cos(w * t), -9 + P.vParallel * t);
+              chargeBall.position.copy(pos);
+
+              trailPts.push(pos.clone());
+              if (trailPts.length > 580) trailPts.shift();
+              updateLinePoints(helixTrail, trailPts);
+
+              const vel = new THREE.Vector3(P.vPerp * Math.cos(w * t), -P.vPerp * Math.sin(w * t), P.vParallel);
+              updateArrow(velArrow, pos, vel, 0.5);
+
+              const force = new THREE.Vector3(-Math.sin(w * t), -Math.cos(w * t), 0).multiplyScalar(P.vPerp * w);
+              updateArrow(forceArrow, pos, force, 0.45);
+            }
+          };
+        }
+      },
+
+      // =======================================================================
+      // QUANTUM PHYSICS (VẬT LÝ LƯỢNG TỬ)
+      // =======================================================================
+
+      // 7. Schrödinger's Cat Thought Experiment (NEW!)
+      {
+        id: 'schrodinger_cat',
+        domain: 'quantum',
+        name: "Schrödinger's Cat",
+        nameVi: "Thí nghiệm Con mèo của Schrödinger",
+        cameraPos: [0, 8, 22],
+        cameraTarget: [0, 3, 0],
+        desc: "Thí nghiệm tưởng tượng nổi tiếng năm 1935 của Erwin Schrödinger nhằm chỉ ra nghịch lý khi áp dụng cơ học lượng tử lên thế giới vĩ mô. Một con mèo trong buồng kín bị nhốt cùng cơ cấu nguyên tử phóng xạ. Cho đến khi người quan sát mở hộp đo đạc, con mèo đồng thời ở trạng thái chồng chập lượng tử vừa Sống vừa Chết.",
+        formulas: [
+          '|\\psi\\rangle = \\frac{1}{\\sqrt{2}} \\left( |\\text{Sống}\\rangle + |\\text{Chết}\\rangle \\right)',
+          'P(\\text{Sống}) = |\\langle\\text{Sống}|\\psi\\rangle|^2 = 50\\%',
+          'P(\\text{Chết}) = |\\langle\\text{Chết}|\\psi\\rangle|^2 = 50\\%',
+          '\\hat{\\rho} = \\frac{1}{2}|S\\rangle\\langle S| + \\frac{1}{2}|C\\rangle\\langle C| \\quad (Giải\\ kết\\ hợp)'
+        ],
+        laws: [
+          'Nguyên lý Chồng chập Lượng tử (Superposition Principle): Trạng thái hạt tồn tại dưới dạng tổ hợp tuyến tính của tất cả các trạng thái cơ sở.',
+          'Tiên đề Đo đạc & Sụp đổ Hàm sóng (Wavefunction Collapse): Quá trình tương tác đo đạc ép hệ lượng tử sụp đổ ngẫu nhiên về một trị riêng xác định.',
+          'Giải thích Copenhagen vs. Thuyết Đa Vũ trụ (Many-Worlds): Cuộc tranh luận thế kỷ về bản chất hiện thực khách quan.'
+        ],
+        apps: [
+          '<strong>Máy tính Lượng tử (Quantum Computing):</strong> Qubit ở trạng thái chồng chập (|0⟩ và |1⟩ đồng thời) tạo nên sức mạnh xử lý song song hàm mũ.',
+          '<strong>Mã hóa Khóa Lượng tử (QKD - BB84):</strong> Bất kỳ hành động nghe lén đo đạc nào cũng làm sụp đổ hàm sóng và lập tức bị phát hiện.',
+          '<strong>Đồng hồ Nguyên tử Quang học:</strong> Đo thời gian siêu chính xác dựa trên trạng thái chồng chập mức năng lượng ion.'
+        ],
+        params: [
+          { key: 'decayHalfLife', label: 'Chu kỳ phân rã T½', min: 1, max: 10, step: 0.5, default: 5, unit: ' s' }
+        ],
+        actionBtn: {
+          label: '👁️ Mở hộp Quan sát (Measure State)',
+          onClick: (sim) => sim.observe()
+        },
+        compute: (P) => {
+          return [
+            { label: 'Trạng thái Lượng tử', val: '|ψ⟩ = ½√2|Sống⟩ + ½√2|Chết⟩' },
+            { label: 'Xác suất Đo đạc', val: '50% Sống · 50% Chết' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 3;
+          parent.add(group);
+
+          // Isolation Chamber
+          const chamber = new THREE.Mesh(
+            new THREE.BoxGeometry(9, 6.5, 6.5),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, transparent: true, opacity: 0.45, roughness: 0.1, metalness: 0.9 })
+          );
+          group.add(chamber);
+
+          const wireFrame = new THREE.LineSegments(
+            new THREE.EdgesGeometry(chamber.geometry),
+            new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.7 })
+          );
+          group.add(wireFrame);
+
+          // Radioactive Flask / Atom
+          const flask = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+          flask.position.set(-2.5, 0, 0);
+          flask.add(makeGlowSprite(0xef4444, 2.5));
+          group.add(flask);
+
+          // Cat representation (Superposition hologram)
+          const cat = new THREE.Mesh(new THREE.IcosahedronGeometry(1.2, 1), new THREE.MeshStandardMaterial({
+            color: 0x22d3ee,
+            wireframe: true,
+            emissive: 0x22d3ee,
+            emissiveIntensity: 0.8
+          }));
+          cat.position.set(1.8, 0, 0);
+          group.add(cat);
+
+          const catGlow = makeGlowSprite(0x22d3ee, 5);
+          cat.add(catGlow);
+
+          let isCollapsed = false;
+          let measuredOutcome = null;
+
+          const reset = () => {
+            isCollapsed = false;
+            measuredOutcome = null;
+            cat.material.color.setHex(0x22d3ee);
+            cat.material.wireframe = true;
+            catGlow.material.color.setHex(0x22d3ee);
+            wireFrame.material.color.setHex(0x22d3ee);
+          };
+
+          const observe = () => {
+            sound.trigger();
+            isCollapsed = true;
+            // 50/50 quantum random collapse
+            measuredOutcome = Math.random() < 0.5 ? 'alive' : 'dead';
+            if (measuredOutcome === 'alive') {
+              cat.material.color.setHex(0x10b981); // Green alive
+              cat.material.wireframe = false;
+              catGlow.material.color.setHex(0x10b981);
+              wireFrame.material.color.setHex(0x10b981);
+              alert('✨ KẾT QUẢ QUAN SÁT:\nHàm sóng sụp đổ!\nTrạng thái đo được: CON MÈO ĐANG SỐNG! 🐱 (Alive)');
+            } else {
+              cat.material.color.setHex(0xef4444); // Red dead
+              cat.material.wireframe = true;
+              catGlow.material.color.setHex(0xef4444);
+              wireFrame.material.color.setHex(0xef4444);
+              alert('💀 KẾT QUẢ QUAN SÁT:\nHàm sóng sụp đổ!\nNguyên tử phóng xạ phân rã: CON MÈO ĐÃ CHẾT! ☠️ (Dead)');
+            }
+          };
+
+          return {
+            reset,
+            observe,
+            update: (dt) => {
+              if (!isCollapsed) {
+                cat.rotation.y += dt * 0.9;
+                cat.rotation.x += dt * 0.4;
+              }
+            }
+          };
+        }
+      },
+
+      // 8. Stern-Gerlach Experiment (NEW!)
+      {
+        id: 'stern_gerlach',
+        domain: 'quantum',
+        name: 'Stern-Gerlach Experiment',
+        nameVi: 'Thí nghiệm Stern-Gerlach (Spin Lượng tử)',
+        cameraPos: [0, 8, 24],
+        cameraTarget: [0, 3, 0],
+        desc: "Thí nghiệm lịch sử năm 1922 của Otto Stern và Walther Gerlach chứng minh tính chất lượng tử hóa không gian của momen động lượng (spin electron). Chùm nguyên tử Bạc bay qua từ trường dị tính không bị nhòe liên tục như vật lý cổ điển dự đoán, mà tách đôi chuẩn xác thành đúng hai vệt riếng biệt: Spin Lên (+½ℏ) và Spin Xuống (−½ℏ).",
+        formulas: [
+          'S_z = \\pm \\frac{1}{2} \\hbar \\quad (Lượng\\ tử\\ hóa\\ Spin)',
+          '\\vec{F}_z = \\nabla (\\vec{\\mu} \\cdot \\vec{B}) \\approx \\mu_z \\frac{\\partial B_z}{\\partial z}',
+          '\\mu_z = -g_s \\mu_B m_s = \\pm \\mu_B \\quad (Bohr\\ Magneton)',
+          '|\\psi\\rangle = \\frac{1}{\\sqrt{2}}|\\uparrow\\rangle + \\frac{1}{\\sqrt{2}}|\\downarrow\\rangle'
+        ],
+        laws: [
+          'Lượng tử hóa Momen Động lượng Không gian: Spin lượng tử không thể định hướng tùy ý liên tục.',
+          'Lực từ dị tính: Chỉ có từ trường không đồng nhất (gradient ∂B/∂z ≠ 0) mới sinh lực tác dụng lên lưỡng cực từ.',
+          'Trạng thái Spin nhị phân: Nền tảng cốt lõi của không gian Hilbert 2 chiều (qubit).'
+        ],
+        apps: [
+          '<strong>Cộng hưởng Từ Hạt nhân (MRI) & ESR:</strong> Phân tách mức năng lượng spin dưới từ trường để chụp ảnh mô não và cơ quan nội tạng y tế.',
+          '<strong>Spintronics & Bộ nhớ MRAM:</strong> Lưu trữ dữ liệu máy tính bằng hướng spin của electron thay vì điện tích, tốc độ đọc ghi nano-giây và không mất dữ liệu.',
+          '<strong>Đồng hồ Nguyên tử Chuẩn Quốc tế:</strong> Chuyển mức siêu mịn của nguyên tử Cesium định nghĩa chính xác 1 giây vật lý.'
+        ],
+        params: [
+          { key: 'gradB', label: 'Gradient từ trường ∂B/∂z', min: 0.5, max: 4.0, step: 0.1, default: 2.0, unit: ' T/m' },
+          { key: 'atomSpeed', label: 'Vận tốc chùm nguyên tử v', min: 1.5, max: 4.5, step: 0.1, default: 2.8, unit: ' km/s' }
+        ],
+        compute: (P) => {
+          const splitDist = (P.gradB * 1.8) / P.atomSpeed;
+          return [
+            { label: 'Độ tách 2 chùm tia Δz', val: splitDist.toFixed(2) + ' cm' },
+            { label: 'Số vệt tách lượng tử', val: 'Đúng 2 vệt (Sz = +½ℏ & Sz = −½ℏ)' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 3.5;
+          parent.add(group);
+
+          // Atom Oven
+          const oven = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 2), new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+          oven.position.x = -10;
+          group.add(oven);
+
+          // Inhomogeneous Magnet Poles
+          // Top sharp knife-edge (N pole)
+          const poleN = new THREE.Mesh(new THREE.ConeGeometry(1.4, 2.5, 4), new THREE.MeshStandardMaterial({ color: 0xef4444 }));
+          poleN.rotation.z = Math.PI;
+          poleN.position.set(0, 3.2, 0);
+          group.add(poleN);
+
+          // Bottom grooved pole (S pole)
+          const poleS = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.8, 4), new THREE.MeshStandardMaterial({ color: 0x3b82f6 }));
+          poleS.position.set(0, -2.5, 0);
+          group.add(poleS);
+
+          // Detection Plate
+          const plate = new THREE.Mesh(new THREE.BoxGeometry(0.2, 8, 6), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+          plate.position.x = 9.5;
+          group.add(plate);
+
+          // Beams
+          const beamUp = makeLine(60, 0x22d3ee, 0.9);
+          const beamDown = makeLine(60, 0xf472b6, 0.9);
+          group.add(beamUp);
+          group.add(beamDown);
+
+          // Two silver deposition spots on screen
+          const spotUp = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), new THREE.MeshBasicMaterial({ color: 0x22d3ee }));
+          const spotDown = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), new THREE.MeshBasicMaterial({ color: 0xf472b6 }));
+          spotUp.position.x = spotDown.position.x = 9.38;
+          group.add(spotUp);
+          group.add(spotDown);
+
+          const reset = () => {
+            const split = (P.gradB * 1.8) / P.atomSpeed;
+            spotUp.position.y = split;
+            spotDown.position.y = -split;
+
+            const ptsUp = [];
+            const ptsDown = [];
+            for (let i = 0; i <= 50; i++) {
+              const x = -10 + (19.4 * i) / 50;
+              let yU = 0, yD = 0;
+              if (x > 0) {
+                const t = x / 9.4;
+                yU = split * t * t;
+                yD = -split * t * t;
+              }
+              ptsUp.push(new THREE.Vector3(x, yU, 0));
+              ptsDown.push(new THREE.Vector3(x, yD, 0));
+            }
+            updateLinePoints(beamUp, ptsUp);
+            updateLinePoints(beamDown, ptsDown);
+          };
+
+          return {
+            reset,
+            update: (dt) => {}
+          };
+        }
+      },
+
+      // 9. Photoelectric Effect - Hertz & Einstein (NEW!)
+      {
+        id: 'photoelectric',
+        domain: 'quantum',
+        name: 'Photoelectric Effect',
+        nameVi: 'Hiệu ứng Quang điện (Hertz & Einstein)',
+        cameraPos: [0, 8, 24],
+        cameraTarget: [0, 3, 0],
+        desc: "Hiện tượng ánh sáng giải phóng electron ra khỏi bề mặt kim loại. Thuyết sóng cổ điển hoàn toàn bất lực trong việc giải thích vì sao tần số photon dưới một ngưỡng nhất định thì dù tăng cường độ ánh sáng đến đâu cũng không giải phóng được electron. Albert Einstein nhận giải Nobel Vật lý năm 1921 nhờ khám phá lượng tử ánh sáng (photon) này.",
+        formulas: [
+          'h\\nu = A + E_{k\\max} = h\\nu_0 + \\frac{1}{2} m v_{\\max}^2',
+          'E_{k\\max} = e V_0 \\quad (Hiệu\\ điện\\ thế\\ hãm)',
+          '\\lambda_0 = \\frac{hc}{A} \\quad (Giới\\ hạn\\ quang\\ điện)',
+          'I_{\\text{bh}} \\propto \\text{Cường độ chùm sáng}'
+        ],
+        laws: [
+          'Định luật I Einstein: Hiện tượng quang điện chỉ xảy ra khi năng lượng photon hν ≥ công thoát A (bước sóng λ ≤ λ₀).',
+          'Định luật II Einstein: Động năng ban đầu cực đại của quang electron chỉ phụ thuộc vào tần số photon và bản chất kim loại, không phụ thuộc cường độ ánh sáng.',
+          'Định luật III: Số electron bật ra trong 1 giây tỷ lệ thuận với số photon chiếu vào (cường độ sáng).'
+        ],
+        apps: [
+          '<strong>Pin Năng lượng Mặt trời (Photovoltaics):</strong> Biến đổi trực tiếp quang năng thành điện năng sạch cho lưới điện và trạm vũ trụ ISS.',
+          '<strong>Cảm biến Ảnh Kỹ thuật số (CMOS/CCD):</strong> Trái tim của mọi camera điện thoại thông minh, máy ảnh chuyên nghiệp và kính viễn vọng không gian Hubble.',
+          '<strong>Ống Nhân Quang điện (PMT):</strong> Đo đạc photon đơn lẻ trong máy quét PET y tế và phát hiện hạt neutrino ngầm dưới lòng đất.'
+        ],
+        params: [
+          { key: 'waveNm', label: 'Bước sóng ánh sáng λ', min: 250, max: 700, step: 10, default: 350, unit: ' nm' },
+          { key: 'workA', label: 'Công thoát kim loại A', min: 1.8, max: 4.8, step: 0.1, default: 2.3, unit: ' eV (K/Na)' },
+          { key: 'vStop', label: 'Điện thế hãm U_hãm', min: 0, max: 3.0, step: 0.1, default: 0.5, unit: ' V' }
+        ],
+        compute: (P) => {
+          const photonE = 1240 / P.waveNm; // eV
+          const EkMax = Math.max(0, photonE - P.workA);
+          const currentFlows = photonE >= P.workA && EkMax > P.vStop;
+          return [
+            { label: 'Năng lượng photon (hν)', val: photonE.toFixed(2) + ' eV' },
+            { label: 'Động năng cực đại Ek_max', val: EkMax.toFixed(2) + ' eV' },
+            { label: 'Dòng quang điện (Ammeter)', val: currentFlows ? ((EkMax - P.vStop) * 4.2).toFixed(2) + ' μA' : '0.00 μA (Bị triệt tiêu)' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 3.5;
+          parent.add(group);
+
+          // Glass tube
+          const tube = new THREE.Mesh(
+            new THREE.CylinderGeometry(2.4, 2.4, 12, 24, 1, true),
+            new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.2, roughness: 0.1 })
+          );
+          tube.rotation.z = Math.PI / 2;
+          group.add(tube);
+
+          // Cathode (metal plate on left)
+          const cathode = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.3, 20), new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.8 }));
+          cathode.rotation.z = Math.PI / 2;
+          cathode.position.x = -4.5;
+          group.add(cathode);
+
+          // Anode (wire loop on right)
+          const anode = new THREE.Mesh(new THREE.TorusGeometry(1.6, 0.1, 16, 32), new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.9 }));
+          anode.rotation.y = Math.PI / 2;
+          anode.position.x = 4.5;
+          group.add(anode);
+
+          // Photons incoming
+          const photonMesh = makeLine(40, 0xfbbf24, 0.8);
+          group.add(photonMesh);
+
+          // Ejected electrons
+          const MAX_ELEC = 60;
+          const elecPos = new Float32Array(MAX_ELEC * 3);
+          const elecGeo = new THREE.BufferGeometry();
+          elecGeo.setAttribute('position', new THREE.BufferAttribute(elecPos, 3));
+          const electrons = new THREE.Points(elecGeo, new THREE.PointsMaterial({
+            size: 0.25,
+            color: 0x22d3ee,
+            blending: THREE.AdditiveBlending,
+            transparent: true
+          }));
+          group.add(electrons);
+
+          const particles = [];
+
+          const reset = () => {
+            particles.length = 0;
+            const photonE = 1240 / P.waveNm;
+            const isEjecting = photonE >= P.workA;
+            photonMesh.material.color.setHex(P.waveNm < 380 ? 0xc084fc : P.waveNm < 500 ? 0x38bdf8 : 0xf59e0b);
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              const photonE = 1240 / P.waveNm;
+              const Ek = Math.max(0, photonE - P.workA);
+              const canReach = Ek > P.vStop;
+
+              if (Ek > 0 && particles.length < MAX_ELEC && Math.random() < 0.35) {
+                particles.push({
+                  x: -4.3,
+                  y: (Math.random() - 0.5) * 2.2,
+                  z: (Math.random() - 0.5) * 2.2,
+                  vx: Math.sqrt(Ek) * 4.5
+                });
+              }
+
+              for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.vx -= P.vStop * 5.0 * dt;
+                p.x += p.vx * dt;
+
+                if (p.x > 4.5 || p.x < -4.5 || p.vx <= 0) {
+                  particles.splice(i, 1);
+                }
+              }
+
+              particles.forEach((p, i) => {
+                elecPos[i * 3] = p.x;
+                elecPos[i * 3 + 1] = p.y;
+                elecPos[i * 3 + 2] = p.z;
+              });
+              elecGeo.setDrawRange(0, particles.length);
+              elecGeo.attributes.position.needsUpdate = true;
+            }
+          };
+        }
+      },
+
+      // 10. Quantum Double-Slit (Wave-Particle Duality)
+      {
+        id: 'double-slit',
+        domain: 'quantum',
+        name: 'Double-Slit Duality',
+        nameVi: 'Giao thoa hai khe Lượng tử',
+        cameraPos: [0, 9, 25],
+        cameraTarget: [0, 3, 0],
+        desc: 'Bắn từng hạt electron đơn lẻ qua hai khe hẹp. Từng hạt rơi xuống màn huỳnh quang như một chấm điểm xác định, nhưng theo thời gian lại tích lũy thành hệ vân giao thoa sóng. Khi bật đầu dò quan sát đường đi, hàm sóng sụp đổ về trạng thái hạt cổ điển.',
+        formulas: [
+          '\\Delta y = \\frac{\\lambda L}{d} \\quad (Khoảng\\ vân\\ giao\\ thoa)',
+          '\\lambda = \\frac{h}{p} \\quad (Bước\\ sóng\\ de\\ Broglie)',
+          'I(y) \\propto |\\Psi_1 + \\Psi_2|^2 = |\\Psi_1|^2 + |\\Psi_2|^2 + 2 \\text{Re}(\\Psi_1^* \\Psi_2)'
+        ],
+        laws: [
+          'Lưỡng tính Sóng - Hạt: Thực thể vi mô vừa có tính chất sóng vừa có tính chất hạt.',
+          'Nguyên lý Chồng chập Lượng tử & Quy tắc Born: Xác suất P = |Ψ|².',
+          'Nguyên lý Bổ sung của Bohr: Không thể đồng thời quan sát cả vân giao thoa lẫn đường đi xác định của hạt.'
+        ],
+        apps: [
+          '<strong>Kính hiển vi điện tử (TEM):</strong> Độ phân giải dưới 0.1 nm thấy từng nguyên tử.',
+          '<strong>Giao thoa kế Nguyên tử:</strong> Cảm biến đo trọng trường độ nhạy lượng tử tuyệt đối.',
+          '<strong>Nhiễu xạ Tia X / Neutron:</strong> Giải mã cấu trúc chuỗi xoắn kép DNA.'
+        ],
+        params: [
+          { key: 'slitDist', label: 'Khoảng cách hai khe d', min: 1.0, max: 3.5, step: 0.1, default: 2.0, unit: ' mm' },
+          { key: 'wavelength', label: 'Bước sóng lượng tử λ', min: 0.3, max: 1.2, step: 0.05, default: 0.65, unit: ' nm' },
+          { key: 'observer', label: 'Đầu dò Quan sát (Which-path)', min: 0, max: 1, step: 1, default: 0, isToggle: true }
+        ],
+        compute: (P) => {
+          const fringeWidth = (P.wavelength * 10) / P.slitDist;
+          return [
+            { label: 'Khoảng vân Δy', val: fringeWidth.toFixed(2) + ' mm' },
+            { label: 'Trạng thái Lượng tử', val: P.observer ? 'Hạt (Sụp đổ hàm sóng)' : 'Sóng (Chồng chập pha)' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 4;
+          parent.add(group);
+
+          const MAX_HITS = 5000;
+          const MAX_BEAMS = 45;
+
+          const gun = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 1.2, 16), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+          gun.rotation.z = Math.PI / 2;
+          gun.position.x = -10.5;
+          group.add(gun);
+
+          const wallGroup = new THREE.Group();
+          group.add(wallGroup);
+
+          const detector = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+          detector.add(makeGlowSprite(0xef4444, 2.5));
+          detector.position.set(0.5, 0, 3.8);
+          group.add(detector);
+
+          const screen = new THREE.Mesh(new THREE.BoxGeometry(0.25, 16, 8), new THREE.MeshBasicMaterial({ color: 0x0f172a, transparent: true, opacity: 0.6 }));
+          screen.position.x = 10.2;
+          group.add(screen);
+
+          const hitPos = new Float32Array(MAX_HITS * 3);
+          const hitGeo = new THREE.BufferGeometry();
+          hitGeo.setAttribute('position', new THREE.BufferAttribute(hitPos, 3));
+          const hits = new THREE.Points(hitGeo, new THREE.PointsMaterial({
+            size: 0.22,
+            color: 0x22d3ee,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          }));
+          hits.frustumCulled = false;
+          group.add(hits);
+
+          const beamPos = new Float32Array(MAX_BEAMS * 3);
+          const beamGeo = new THREE.BufferGeometry();
+          beamGeo.setAttribute('position', new THREE.BufferAttribute(beamPos, 3));
+          const beams = new THREE.Points(beamGeo, new THREE.PointsMaterial({
+            size: 0.42,
+            color: 0xffffff,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          }));
+          beams.frustumCulled = false;
+          group.add(beams);
+
+          let hitCount = 0, inFlight = [], accSpawn = 0;
+
+          const sampleScreenY = () => {
+            const d = P.slitDist;
+            const L = 10.0;
+            const k = Math.PI / (P.wavelength * L);
+            const slitSign = Math.random() < 0.5 ? 1 : -1;
+            const slitY = (slitSign * d) / 2;
+
+            if (P.observer) {
+              const spread = (Math.random() + Math.random() + Math.random() - 1.5) * 1.5;
+              return { slitY, y: slitY + spread, z: (Math.random() - 0.5) * 6 };
+            }
+
+            for (let iter = 0; iter < 1000; iter++) {
+              const y = (Math.random() * 2 - 1) * 7;
+              const u = k * 0.5 * y;
+              const sinc = Math.abs(u) < 1e-4 ? 1 : Math.sin(u) / u;
+              const I = Math.cos(k * d * y) ** 2 * (sinc ** 2);
+              if (Math.random() < I) {
+                return { slitY, y, z: (Math.random() - 0.5) * 6 };
+              }
+            }
+            return { slitY, y: 0, z: 0 };
+          };
+
+          const rebuildWall = () => {
+            while (wallGroup.children.length) wallGroup.remove(wallGroup.children[0]);
+            const d = P.slitDist;
+            const slitWidth = 0.5;
+            const segments = [
+              [-8, -d / 2 - slitWidth / 2],
+              [-d / 2 + slitWidth / 2, d / 2 - slitWidth / 2],
+              [d / 2 + slitWidth / 2, 8]
+            ];
+            segments.forEach(([y0, y1]) => {
+              const h = y1 - y0;
+              const block = new THREE.Mesh(new THREE.BoxGeometry(0.35, h, 8), new THREE.MeshBasicMaterial({ color: 0x475569 }));
+              block.position.y = (y0 + y1) / 2;
+              wallGroup.add(block);
+            });
+            detector.visible = Boolean(P.observer);
+          };
+
+          const reset = () => {
+            hitCount = 0;
+            inFlight = [];
+            hitGeo.setDrawRange(0, 0);
+            rebuildWall();
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              accSpawn += dt * 50;
+              while (accSpawn >= 1) {
+                accSpawn--;
+                if (inFlight.length < MAX_BEAMS) {
+                  const s = sampleScreenY();
+                  inFlight.push({ t: 0, slitY: s.slitY, targetY: s.y, z: s.z });
+                }
+              }
+
+              for (let i = inFlight.length - 1; i >= 0; i--) {
+                const p = inFlight[i];
+                p.t += dt * 1.35;
+                if (p.t >= 1) {
+                  const idx = (hitCount++ % MAX_HITS) * 3;
+                  hitPos[idx] = 10.05;
+                  hitPos[idx + 1] = p.targetY;
+                  hitPos[idx + 2] = p.z;
+                  inFlight.splice(i, 1);
+                }
+              }
+
+              hitGeo.attributes.position.needsUpdate = true;
+              hitGeo.setDrawRange(0, Math.min(hitCount, MAX_HITS));
+
+              inFlight.forEach((p, i) => {
+                const firstHalf = p.t < 0.5;
+                const u = firstHalf ? p.t * 2 : (p.t - 0.5) * 2;
+                const x = firstHalf ? -10 + 10 * u : 10 * u;
+                const y = firstHalf ? p.slitY * u : p.slitY + (p.targetY - p.slitY) * u;
+                beamPos[i * 3] = x;
+                beamPos[i * 3 + 1] = y;
+                beamPos[i * 3 + 2] = p.z;
+              });
+              beamGeo.setDrawRange(0, inFlight.length);
+              beamGeo.attributes.position.needsUpdate = true;
+            }
+          };
+        }
+      },
+
+      // 11. Quantum Tunneling (TDSE)
+      {
+        id: 'tunneling',
+        domain: 'quantum',
+        name: 'Quantum Tunneling',
+        nameVi: 'Hiệu ứng đường hầm lượng tử',
+        cameraPos: [0, 9, 26],
+        cameraTarget: [0, 4, 0],
+        desc: 'Một gói sóng lượng tử có mức năng lượng E va chạm với hàng rào thế năng cao V₀ (E < V₀). Hàm sóng xuyên vào hàng rào dưới dạng suy giảm hàm mũ, dẫn tới xác suất T xuyên qua bờ bên kia.',
+        formulas: [
+          'i\\hbar \\frac{\\partial \\Psi}{\\partial t} = -\\frac{\\hbar^2}{2m} \\frac{\\partial^2 \\Psi}{\\partial x^2} + V(x)\\Psi',
+          'T \\approx 16 \\frac{E}{V_0} \\left(1 - \\frac{E}{V_0}\\right) e^{-2\\kappa a} \\quad (\\kappa = \\frac{\\sqrt{2m(V_0 - E)}}{\\hbar})',
+          'R + T = 1 \\quad (Bảo\\ toàn\\ dòng\\ xác\\ suất)'
+        ],
+        laws: [
+          'Phương trình sóng Schrödinger phụ thuộc thời gian (TDSE).',
+          'Hệ thức Bất định Heisenberg: Δx·Δp ≥ ℏ/2.',
+          'Tính liên tục của hàm sóng Ψ(x) và đạo hàm bậc nhất Ψ\'(x).'
+        ],
+        apps: [
+          '<strong>Tổng hợp hạt nhân ở Mặt Trời:</strong> Proton vượt rào đẩy Coulomb bằng chui hầm.',
+          '<strong>Kính hiển vi STM:</strong> Chui hầm qua khe hở vẽ bản đồ từng nguyên tử.',
+          '<strong>Bộ nhớ Flash SSD:</strong> Nạp điện tử qua lớp cách điện oxit.'
+        ],
+        params: [
+          { key: 'energy', label: 'Năng lượng hạt E', min: 1.0, max: 8.5, step: 0.1, default: 3.2, unit: ' eV' },
+          { key: 'barrierV0', label: 'Chiều cao rào thế V₀', min: 2.0, max: 10.0, step: 0.2, default: 6.0, unit: ' eV' },
+          { key: 'barrierWidth', label: 'Độ dày hàng rào a', min: 0.3, max: 2.0, step: 0.1, default: 0.7, unit: ' nm' }
+        ],
+        compute: (P) => {
+          const E = P.energy;
+          const V0 = P.barrierV0;
+          const a = P.barrierWidth;
+          let T;
+          if (E < V0) {
+            const kappa = Math.sqrt(2 * (V0 - E));
+            T = 1 / (1 + (V0 * V0 * Math.sinh(kappa * a) ** 2) / (4 * E * (V0 - E)));
+          } else {
+            const k2 = Math.sqrt(2 * (E - V0));
+            T = 1 / (1 + (V0 * V0 * Math.sin(k2 * a) ** 2) / (4 * E * (E - V0)));
+          }
+          return [
+            { label: 'Hệ số xuyên hầm T (Lý thuyết)', val: (T * 100).toFixed(1) + ' %' },
+            { label: 'Hệ số phản xạ R', val: ((1 - T) * 100).toFixed(1) + ' %' },
+            { label: 'Vật lý cổ điển dự đoán', val: E < V0 ? 'T = 0% (Bị chặn 100%)' : 'T = 100%' }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 4;
+          parent.add(group);
+
+          const N = 256;
+          const X_SPAN = 38;
+          const dx = X_SPAN / N;
+          const Real = new Float32Array(N);
+          const Imag = new Float32Array(N);
+          const Potential = new Float32Array(N);
+
+          const probLine = makeLine(N, 0x22d3ee, 1.0);
+          const realLine = makeLine(N, 0x67e8f9, 0.4);
+          group.add(probLine);
+          group.add(realLine);
+
+          const barrierBox = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1, 4),
+            new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.35 })
+          );
+          group.add(barrierBox);
+
+          const energyLine = makeLine(2, 0xfbbf24, 0.75);
+          group.add(energyLine);
+
+          const xAt = (i) => -X_SPAN / 2 + i * dx;
+          for (let i = 0; i < N; i++) {
+            probLine.geometry.attributes.position.setX(i, xAt(i));
+            realLine.geometry.attributes.position.setX(i, xAt(i));
+          }
+
+          let accSteps = 0, initialNorm = 1;
+
+          const reset = () => {
+            const k0 = Math.sqrt(2 * P.energy);
+            initialNorm = 0;
+            for (let i = 0; i < N; i++) {
+              const x = xAt(i);
+              const env = Math.exp(-((x + 10) ** 2) / 6.0);
+              Real[i] = env * Math.cos(k0 * x);
+              Imag[i] = env * Math.sin(k0 * x);
+              Potential[i] = x > 0 && x < P.barrierWidth ? P.barrierV0 : 0;
+              initialNorm += env * env;
+            }
+
+            barrierBox.scale.set(P.barrierWidth, P.barrierV0 * 0.8, 1);
+            barrierBox.position.set(P.barrierWidth / 2, (P.barrierV0 * 0.8) / 2, 0);
+            updateLinePoints(energyLine, [new THREE.Vector3(-18, P.energy * 0.8, 0), new THREE.Vector3(18, P.energy * 0.8, 0)]);
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              accSteps += dt * 380;
+              const n = Math.floor(accSteps);
+              accSteps -= n;
+              const dtSub = 0.007;
+
+              for (let s = 0; s < n; s++) {
+                for (let i = 1; i < N - 1; i++) {
+                  Real[i] += dtSub * (-0.5 * (Imag[i + 1] - 2 * Imag[i] + Imag[i - 1]) / (dx * dx) + Potential[i] * Imag[i]);
+                }
+                for (let i = 1; i < N - 1; i++) {
+                  Imag[i] -= dtSub * (-0.5 * (Real[i + 1] - 2 * Real[i] + Real[i - 1]) / (dx * dx) + Potential[i] * Real[i]);
+                }
+                for (let i = 0; i < 12; i++) {
+                  Real[i] *= 0.97; Imag[i] *= 0.97;
+                  Real[N - 1 - i] *= 0.97; Imag[N - 1 - i] *= 0.97;
+                }
+              }
+
+              const posProb = probLine.geometry.attributes.position;
+              const posReal = realLine.geometry.attributes.position;
+              let currentNorm = 0;
+
+              for (let i = 0; i < N; i++) {
+                const p = Real[i] * Real[i] + Imag[i] * Imag[i];
+                posProb.setY(i, p * 5.5);
+                posReal.setY(i, Real[i] * 2.8);
+                currentNorm += p;
+              }
+              posProb.needsUpdate = true;
+              posReal.needsUpdate = true;
+
+              if (currentNorm < initialNorm * 0.03) {
+                reset();
+              }
+            }
+          };
+        }
+      },
+
+      // 12. Atomic Orbitals (1s, 2s, 2p, 3d)
+      {
+        id: 'orbitals',
+        domain: 'quantum',
+        name: 'Atomic Orbitals',
+        nameVi: 'Đám mây Orbital Nguyên tử',
+        cameraPos: [0, 8, 22],
+        cameraTarget: [0, 4, 0],
+        desc: 'Trong cơ học lượng tử, electron tồn tại dưới dạng sóng dừng 3 chiều, với |Ψ|² là mật độ xác suất tìm thấy electron. Màu lục lam và hồng thể hiện dấu pha (+/−) của hàm sóng.',
+        formulas: [
+          '\\hat{H}\\psi = E\\psi',
+          '\\psi_{nlm}(r, \\theta, \\phi) = R_{nl}(r) \\cdot Y_{lm}(\\theta, \\phi)',
+          'E_n = -\\frac{13.6\\text{ eV}}{n^2}',
+          'P(r)dr = |\\psi|^2 4\\pi r^2 dr'
+        ],
+        laws: [
+          'Nguyên lý Loại trừ Pauli: Không có hai fermion nào có cùng 4 số lượng tử.',
+          'Các Số lượng tử: n (chính), l (quỹ đạo: s, p, d, f), m (hình chiếu từ).',
+          'Nguyên tắc Aufbau & Quy tắc Hund: Electron điền vào phân mức năng lượng thấp trước.'
+        ],
+        apps: [
+          '<strong>Lai hóa Obitan (sp, sp², sp³):</strong> Cấu trúc không gian của mọi phân tử hữu cơ và DNA.',
+          '<strong>Lý thuyết Dải năng lượng:</strong> Nền tảng vi mạch bán dẫn Si và chip vi xử lý.',
+          '<strong>Cộng hưởng Từ hạt nhân (MRI):</strong> Chẩn đoán hình ảnh y học không xâm lấn.'
+        ],
+        params: [
+          { key: 'orbitalIdx', label: 'Cấu hình Orbital', min: 0, max: 3, step: 1, default: 0, displayMap: ['1s', '2s', '2p_z', '3d_z²'] }
+        ],
+        compute: (P) => {
+          const names = ['1s (n=1, l=0)', '2s (n=2, l=0)', '2p_z (n=2, l=1)', '3d_z² (n=3, l=2)'];
+          const energies = ['-13.60 eV', '-3.40 eV', '-3.40 eV', '-1.51 eV'];
+          return [
+            { label: 'Trạng thái', val: names[P.orbitalIdx] },
+            { label: 'Năng lượng liên kết', val: energies[P.orbitalIdx] },
+            { label: 'Độ suy biến bậc 2n²', val: [2, 8, 8, 18][P.orbitalIdx] }
+          ];
+        },
+        createSim: (parent, P) => {
+          const group = new THREE.Group();
+          group.position.y = 5;
+          parent.add(group);
+
+          const N = 5000;
+          const pos = new Float32Array(N * 3);
+          const col = new Float32Array(N * 3);
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+          geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+          const points = new THREE.Points(geo, new THREE.PointsMaterial({
+            size: 0.16,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.85,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          }));
+          points.frustumCulled = false;
+          group.add(points);
+
+          const nucleus = new THREE.Mesh(new THREE.SphereGeometry(0.25, 16, 16), new THREE.MeshBasicMaterial({ color: 0xfde047 }));
+          nucleus.add(makeGlowSprite(0xfde047, 1.8));
+          group.add(nucleus);
+
+          const WF = [
+            (r, cosT) => Math.exp(-r),
+            (r, cosT) => (2 - r) * Math.exp(-r / 2),
+            (r, cosT) => r * Math.exp(-r / 2) * cosT,
+            (r, cosT) => r * r * Math.exp(-r / 3) * (3 * cosT * cosT - 1)
+          ];
+          const R_MAX = [6, 12, 12, 24];
+          const PROB_MAX = [1.0, 4.0, 0.6, 90.0];
+          const SCALE = [2.2, 0.9, 0.9, 0.5];
+
+          const cyanColor = new THREE.Color(0x22d3ee);
+          const pinkColor = new THREE.Color(0xf472b6);
+
+          const reset = () => {
+            const idx = P.orbitalIdx;
+            const rLim = R_MAX[idx];
+            let count = 0, trials = 0;
+
+            while (count < N && trials++ < 500000) {
+              const x = (Math.random() * 2 - 1) * rLim;
+              const y = (Math.random() * 2 - 1) * rLim;
+              const z = (Math.random() * 2 - 1) * rLim;
+              const r = Math.hypot(x, y, z) || 1e-5;
+              const cosTheta = y / r;
+              const psi = WF[idx](r, cosTheta);
+              const prob = psi * psi;
+
+              if (prob > Math.random() * PROB_MAX[idx]) {
+                const s = SCALE[idx];
+                pos[count * 3] = x * s;
+                pos[count * 3 + 1] = y * s;
+                pos[count * 3 + 2] = z * s;
+                const c = psi > 0 ? cyanColor : pinkColor;
+                col[count * 3] = c.r;
+                col[count * 3 + 1] = c.g;
+                col[count * 3 + 2] = c.b;
+                count++;
+              }
+            }
+            geo.setDrawRange(0, count);
+            geo.attributes.position.needsUpdate = true;
+            geo.attributes.color.needsUpdate = true;
+          };
+
+          return {
+            reset,
+            update: (dt) => {
+              group.rotation.y += dt * 0.35;
+            }
+          };
+        }
+      }
+    ];
+
+    /* =========================================================================
+       APP NAVIGATION & ORBITAL NODES
+       ========================================================================= */
+    const State = {
+      domain: 'classical',
+      activeId: null,
+      isPlaying: true,
+      simSpeed: 1.0,
+      stepTrigger: false,
+      cameraTween: null,
+      params: {}
+    };
+
+    const nodeGroup = new THREE.Group();
+    scene.add(nodeGroup);
+    const nodeCores = [];
+
+    const setupOrbitNodes = () => {
+      EXPERIMENTS.forEach((exp) => {
+        const domainExps = EXPERIMENTS.filter((e) => e.domain === exp.domain);
+        const idx = domainExps.indexOf(exp);
+        const total = domainExps.length;
+        const angle = (idx / total) * Math.PI * 2 + 0.3;
+        const radius = 11.5;
+
+        exp.overviewPos = new THREE.Vector3(
+          Math.cos(angle) * radius,
+          Math.sin(idx * 1.8) * 3.0,
+          Math.sin(angle) * radius
+        );
+
+        const colorHex = exp.domain === 'classical' ? 0xfbbf24 : 0x22d3ee;
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(1.0, 24, 24),
+          new THREE.MeshStandardMaterial({
+            color: colorHex,
+            emissive: colorHex,
+            emissiveIntensity: 0.65,
+            roughness: 0.25,
+            metalness: 0.8
+          })
+        );
+        mesh.position.copy(exp.overviewPos);
+
+        const glow = makeGlowSprite(colorHex, 5.2);
+        mesh.add(glow);
+
+        const label = makeTextSprite(exp.name, exp.nameVi);
+        mesh.add(label);
+
+        mesh.userData = { exp, glow, origScale: 1.0 };
+        nodeGroup.add(mesh);
+        nodeCores.push(mesh);
+      });
+    };
+    setupOrbitNodes();
+
+    let activeSimStage = null;
+    let activeSimEngine = null;
+
+    const flyCamera = (targetCamPos, targetLookAt) => {
+      State.cameraTween = {
+        p0: camera.position.clone(),
+        t0: controls.target.clone(),
+        p1: targetCamPos,
+        t1: targetLookAt,
+        alpha: 0
+      };
+    };
+
+    const renderNodeList = () => {
+      const listEl = document.getElementById('experiment-list');
+      const query = document.getElementById('search-input').value.toLowerCase();
+      listEl.innerHTML = '';
+
+      EXPERIMENTS.forEach((exp) => {
+        const matchesDomain = exp.domain === State.domain;
+        const matchesSearch = !query || exp.name.toLowerCase().includes(query) || exp.nameVi.toLowerCase().includes(query);
+        const isVisible = matchesDomain && matchesSearch;
+
+        const core = nodeCores.find((c) => c.userData.exp.id === exp.id);
+        if (core) core.visible = isVisible && !State.activeId;
+
+        if (isVisible) {
+          const item = document.createElement('div');
+          item.className = `node-item ${exp.id === State.activeId ? 'active' : ''}`;
+          item.innerHTML = `
+            <div class="name">${exp.name}</div>
+            <div class="sub">${exp.nameVi}</div>
+          `;
+          item.onclick = () => selectExperiment(exp.id);
+          listEl.appendChild(item);
+        }
+      });
+    };
+
+    const setDomain = (domain) => {
+      State.domain = domain;
+      sound.switchDomain();
+
+      document.body.className = domain === 'quantum' ? 'quantum' : '';
+      document.getElementById('tab-classical').className = `tab-btn ${domain === 'classical' ? 'active' : ''}`;
+      document.getElementById('tab-quantum').className = `tab-btn ${domain === 'quantum' ? 'active' : ''}`;
+      document.getElementById('domain-badge').textContent = domain === 'classical' ? 'Classical Physics' : 'Quantum Physics';
+
+      centerCore.material.color.setHex(domain === 'classical' ? 0xfbbf24 : 0x22d3ee);
+
+      if (State.activeId) {
+        returnToOverview();
+      } else {
+        renderNodeList();
+      }
+    };
+
+    const selectExperiment = (id) => {
+      const exp = EXPERIMENTS.find((e) => e.id === id);
+      if (!exp) return;
+
+      sound.click();
+      State.activeId = id;
+
+      State.params = {};
+      exp.params.forEach((p) => {
+        State.params[p.key] = p.default;
+      });
+
+      if (activeSimStage) {
+        scene.remove(activeSimStage);
+        activeSimStage = null;
+        activeSimEngine = null;
+      }
+
+      nodeCores.forEach((c) => (c.visible = false));
+
+      activeSimStage = new THREE.Group();
+      activeSimStage.position.set(0, -80, 0);
+
+      const gridColor = exp.domain === 'quantum' ? 0x0891b2 : 0xb45309;
+      const grid = new THREE.GridHelper(50, 50, gridColor, 0x1e293b);
+      activeSimStage.add(grid);
+
+      scene.add(activeSimStage);
+
+      activeSimEngine = exp.createSim(activeSimStage, State.params);
+      activeSimEngine.reset();
+
+      const stageCamPos = new THREE.Vector3(...exp.cameraPos).add(activeSimStage.position);
+      const stageLookAt = new THREE.Vector3(...exp.cameraTarget).add(activeSimStage.position);
+      flyCamera(stageCamPos, stageLookAt);
+
+      renderKnowledgeDrawer(exp);
+      renderNodeList();
+    };
+
+    const returnToOverview = () => {
+      State.activeId = null;
+      if (activeSimStage) {
+        scene.remove(activeSimStage);
+        activeSimStage = null;
+        activeSimEngine = null;
+      }
+      document.getElementById('right-drawer').classList.remove('open');
+      flyCamera(HOME_CAM_POS.clone(), HOME_CAM_TARGET.clone());
+      renderNodeList();
+    };
+
+    // Tab switcher inside Knowledge Drawer
+    document.querySelectorAll('.drawer-tab').forEach((tab) => {
+      tab.onclick = () => {
+        document.querySelectorAll('.drawer-tab').forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach((c) => (c.style.display = 'none'));
+        const content = document.getElementById(`content-${target}`);
+        if (content) content.style.display = 'block';
+      };
+    });
+
+    const renderKnowledgeDrawer = (exp) => {
+      const drawer = document.getElementById('right-drawer');
+      drawer.classList.add('open');
+
+      document.getElementById('drawer-title').textContent = exp.name;
+      document.getElementById('drawer-sub').textContent = exp.nameVi;
+      document.getElementById('drawer-desc').textContent = exp.desc;
+
+      // Special interactive 3D Action buttons (like Schrödinger's cat observe button)
+      const actionContainer = document.getElementById('drawer-action-container');
+      actionContainer.innerHTML = '';
+      if (exp.actionBtn) {
+        const btn = document.createElement('button');
+        btn.className = 'action-trigger-btn';
+        btn.innerHTML = exp.actionBtn.label;
+        btn.onclick = () => exp.actionBtn.onClick(activeSimEngine);
+        actionContainer.appendChild(btn);
+      }
+
+      // Render Formulas with KaTeX
+      const formulasEl = document.getElementById('drawer-formulas');
+      formulasEl.innerHTML = '';
+      exp.formulas.forEach((tex) => {
+        const box = document.createElement('div');
+        box.className = 'formula-box';
+        try {
+          if (window.katex) {
+            window.katex.render(tex, box, { throwOnError: false, displayMode: true });
+          } else {
+            box.textContent = tex;
+          }
+        } catch (e) {
+          box.textContent = tex;
+        }
+        formulasEl.appendChild(box);
+      });
+
+      // Render Dynamic Sliders
+      const slidersEl = document.getElementById('drawer-sliders');
+      slidersEl.innerHTML = '';
+      exp.params.forEach((param) => {
+        if (param.isToggle) {
+          const row = document.createElement('div');
+          row.className = 'toggle-row';
+          row.innerHTML = `
+            <span style="font-size: 13px;">${param.label}</span>
+            <button class="toggle-btn ${State.params[param.key] ? 'on' : ''}" id="toggle-${param.key}">
+              ${State.params[param.key] ? 'Đang Bật (Hạt)' : 'Tắt (Sóng)'}
+            </button>
+          `;
+          const btn = row.querySelector('button');
+          btn.onclick = () => {
+            sound.trigger();
+            State.params[param.key] = State.params[param.key] ? 0 : 1;
+            btn.className = `toggle-btn ${State.params[param.key] ? 'on' : ''}`;
+            btn.textContent = State.params[param.key] ? 'Đang Bật (Hạt)' : 'Tắt (Sóng)';
+            syncMetrics(exp);
+            if (activeSimEngine) activeSimEngine.reset();
+          };
+          slidersEl.appendChild(row);
+        } else {
+          const row = document.createElement('div');
+          row.className = 'param-row';
+          const valDisplay = param.displayMap ? param.displayMap[State.params[param.key]] : (State.params[param.key] + (param.unit || ''));
+          row.innerHTML = `
+            <div class="param-label">
+              <span>${param.label}</span>
+              <b id="val-${param.key}">${valDisplay}</b>
+            </div>
+            <input type="range" min="${param.min}" max="${param.max}" step="${param.step}" value="${State.params[param.key]}" data-key="${param.key}" />
+          `;
+          const input = row.querySelector('input');
+          input.oninput = (e) => {
+            const v = parseFloat(e.target.value);
+            State.params[param.key] = v;
+            const updatedText = param.displayMap ? param.displayMap[v] : (v + (param.unit || ''));
+            document.getElementById(`val-${param.key}`).textContent = updatedText;
+            syncMetrics(exp);
+            if (activeSimEngine) activeSimEngine.reset();
+          };
+          slidersEl.appendChild(row);
+        }
+      });
+
+      // Render Laws
+      const lawsEl = document.getElementById('drawer-laws');
+      lawsEl.innerHTML = `<ul style="padding-left: 18px; margin: 0;">${exp.laws.map((l) => `<li style="margin-bottom: 8px;">${l}</li>`).join('')}</ul>`;
+
+      // Render Applications
+      const appsEl = document.getElementById('drawer-apps');
+      appsEl.innerHTML = exp.apps.map((app) => `<div class="app-card">${app}</div>`).join('');
+
+      syncMetrics(exp);
+      drawer.scrollTop = 0;
+    };
+
+    const syncMetrics = (exp) => {
+      const metricsEl = document.getElementById('drawer-metrics');
+      const outputs = exp.compute(State.params);
+      metricsEl.innerHTML = outputs.map((o) => `<div><span>${o.label}:</span> <b>${o.val}</b></div>`).join('');
+    };
+
+    /* =========================================================================
+       USER RAYCASTING & CLICK
+       ========================================================================= */
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let hoveredNode = null;
+    let pointerDownCoord = [0, 0];
+
+    const getIntersectedNode = (e) => {
+      if (State.activeId) return null;
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const visibleCores = nodeCores.filter((c) => c.visible);
+      const intersects = raycaster.intersectObjects(visibleCores);
+      return intersects.length > 0 ? intersects[0].object : null;
+    };
+
+    canvas.addEventListener('pointermove', (e) => {
+      const hit = getIntersectedNode(e);
+      if (hit !== hoveredNode) {
+        if (hit) sound.hover();
+        hoveredNode = hit;
+        canvas.style.cursor = hit ? 'pointer' : 'default';
+      }
+    });
+
+    canvas.addEventListener('pointerdown', (e) => {
+      pointerDownCoord = [e.clientX, e.clientY];
+    });
+
+    canvas.addEventListener('click', (e) => {
+      const dist = Math.hypot(e.clientX - pointerDownCoord[0], e.clientY - pointerDownCoord[1]);
+      if (dist < 6) {
+        const hit = getIntersectedNode(e);
+        if (hit && hit.userData.exp) {
+          selectExperiment(hit.userData.exp.id);
+        }
+      }
+    });
+
+    document.getElementById('tab-classical').onclick = () => setDomain('classical');
+    document.getElementById('tab-quantum').onclick = () => setDomain('quantum');
+    document.getElementById('search-input').oninput = renderNodeList;
+    document.getElementById('btn-close-drawer').onclick = returnToOverview;
+    document.getElementById('btn-reset-cam').onclick = returnToOverview;
+
+    const playBtn = document.getElementById('btn-play-pause');
+    const slowBtn = document.getElementById('btn-slow-mo');
+    const stepBtn = document.getElementById('btn-step-fwd');
+    const resetBtn = document.getElementById('btn-restart');
+
+    playBtn.onclick = () => {
+      State.isPlaying = !State.isPlaying;
+      playBtn.textContent = State.isPlaying ? '⏸ Pause' : '▶ Play';
+      playBtn.classList.toggle('active', !State.isPlaying);
+    };
+
+    slowBtn.onclick = () => {
+      State.simSpeed = State.simSpeed === 1.0 ? 0.25 : 1.0;
+      slowBtn.classList.toggle('active', State.simSpeed < 1.0);
+    };
+
+    stepBtn.onclick = () => {
+      State.isPlaying = false;
+      playBtn.textContent = '▶ Play';
+      playBtn.classList.add('active');
+      State.stepTrigger = true;
+    };
+
+    resetBtn.onclick = () => {
+      if (activeSimEngine) activeSimEngine.reset();
+    };
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /* =========================================================================
+       MAIN RENDER & ANIMATION LOOP
+       ========================================================================= */
+    let lastTime = performance.now();
+
+    const animate = (currentTime) => {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(0.05, (currentTime - lastTime) / 1000);
+      lastTime = currentTime;
+      const elapsedTime = currentTime / 1000;
+
+      // 1. Camera Tween
+      if (State.cameraTween) {
+        const tw = State.cameraTween;
+        tw.alpha = Math.min(1.0, tw.alpha + dt / 1.5);
+        const ease = tw.alpha < 0.5 ? 4 * tw.alpha ** 3 : 1 - Math.pow(-2 * tw.alpha + 2, 3) / 2;
+        camera.position.lerpVectors(tw.p0, tw.p1, ease);
+        controls.target.lerpVectors(tw.t0, tw.t1, ease);
+        if (tw.alpha >= 1.0) State.cameraTween = null;
+      }
+
+      // 2. Physics Simulation Engine
+      if (activeSimEngine) {
+        let simDt = 0;
+        if (State.isPlaying) {
+          simDt = dt * State.simSpeed;
+        } else if (State.stepTrigger) {
+          simDt = (1.0 / 30) * State.simSpeed;
+          State.stepTrigger = false;
+        }
+        if (simDt > 0) activeSimEngine.update(simDt);
+      }
+
+      // 3. Orbital Nodes Motion
+      if (!State.activeId) {
+        nodeGroup.rotation.y = elapsedTime * 0.035;
+        centerCore.rotation.set(elapsedTime * 0.15, elapsedTime * 0.25, 0);
+
+        nodeCores.forEach((core, i) => {
+          if (!core.visible) return;
+          const isHov = core === hoveredNode;
+          const targetScale = isHov ? 1.35 : 1.0;
+          core.scale.lerp(new THREE.Vector3(targetScale, targetScale, targetScale), 0.15);
+          core.userData.glow.material.opacity = isHov ? 0.95 : 0.5;
+
+          const base = core.userData.exp.overviewPos;
+          core.position.y = base.y + Math.sin(elapsedTime * 1.5 + i * 2) * 0.45;
+        });
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    };
+
+    animate(performance.now());
+    renderNodeList();
+  </script>
+</body>
+</html>
